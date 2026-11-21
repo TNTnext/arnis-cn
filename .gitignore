@@ -37,6 +37,7 @@ Thumbs.db
 /*debug*.png
 /terrain-tile-cache
 /arnis-tile-cache
+/arnis-overture-cache
 # Scratch dumps from the facade work: the lab's preview sheets
 # (tools/facade_lab/prefetch.py writes ../../facade_debug/previews.tsv beside
 # the crops) and whatever --mapillary-facade-debug-dir is pointed at here.

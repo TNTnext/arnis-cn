@@ -124,6 +124,8 @@ const SETTINGS = [
   { id: 'meld-region-format-group', kind: 'segmented', store: OWN, valueAttr: 'data-v' },
   { id: 'meld-blinear-level-input', kind: 'number', store: OWN },
   { id: 'meld-osm-source-group', kind: 'segmented', store: OWN, valueAttr: 'data-v' },
+  { id: 'meld-detail-data-group', kind: 'segmented', store: OWN, valueAttr: 'data-v' },
+  { id: 'meld-china-province-select', kind: 'select', store: OWN },
   { id: 'meld-archive-folder-input', kind: 'text', store: OWN },
   { id: 'meld-pbf-url-input', kind: 'text', store: OWN },
   { id: 'meld-overpass-input', kind: 'text', store: OWN },

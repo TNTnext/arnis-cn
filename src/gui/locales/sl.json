@@ -408,6 +408,12 @@
   "meld_blinear_level_desc": "Raven stiskanja regij B_Linear.",
   "meld_osm_source": "Vir podatkov OSM",
   "meld_osm_source_desc": "Od kod prihajajo podatki zemljevida.",
+  "detail_data": "Detailed Map Data",
+  "detail_data_desc": "Keep the standard map or add recent Overture roads and places.",
+  "detail_data_standard": "Standard",
+  "detail_data_overture": "Overture Monthly Detail",
+  "detail_data_tip": "Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.",
+  "data_source_overture_detail": "Roads and places",
   "meld_archive_folder": "Mapa arhiva",
   "meld_archive_folder_desc": "Mapa lokalnega arhiva ploščic. Poskusno.",
   "meld_pbf_url": "URL izvlečka",
@@ -876,5 +882,13 @@
   "lidar_limit": "Omejitev prenosa",
   "lidar_limit_desc": "Največ, kar en zagon prenese laserskih podatkov.",
   "lidar_limit_tip": "Največ, kar en zagon prenese laserskih podatkov. Predpomnjeni skeni ne štejejo. Nad mejo zagon teče brez njih. En km² je okoli 100–300 MB.",
-  "lidar_over_limit": "Laserski podatki izpuščeni: območje potrebuje približno {mb} MB, več kot Omejitev prenosa ({limit} MB). Povečajte jo v Nastavitve prilagajanja > Napredno > Laserski podatki."
+  "lidar_over_limit": "Laserski podatki izpuščeni: območje potrebuje približno {mb} MB, več kot Omejitev prenosa ({limit} MB). Povečajte jo v Nastavitve prilagajanja > Napredno > Laserski podatki.",
+    "meld_osm_source_china_national": "China Nationwide",
+    "meld_osm_source_china": "China Province",
+  "meld_china_province": "China Province",
+  "meld_china_province_desc": "Use the province-level OpenStreetMap source for China.",
+  "placeholder_meld_china_province": "Choose a province",
+  "reason_china": "Pick China Province as the OSM Data Source.",
+  "meld_china_province_required": "Choose a China province first.",
+  "meld_china_province_tip": "Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices."
 }

@@ -2296,6 +2296,9 @@ const WINDOW_FLAGS: &[&str] = &[
     "world-border",
     "region-format",
     "blinear-level",
+    "china-national",
+    "china-province",
+    "overture-detail",
     "osm-pbf",
     "osm-pbf-url",
     "osm-tiles-url",
@@ -2425,6 +2428,14 @@ fn piece_argv(args: &Args, world_path: &Path, flags: &[String]) -> Vec<std::ffi:
         format!("--facade-detail={}", name(&args.facade_detail)),
         format!("--facade-px={}", args.facade_px),
     ];
+    // The window flag already says whether this source is wanted; repeating the
+    // same boolean would make Clap reject the piece command line.
+    if !flags
+        .iter()
+        .any(|flag| flag.starts_with("--overture-detail"))
+    {
+        values.push(format!("--overture-detail={}", args.overture_detail));
+    }
     let switches = [
         ("--fillground", args.fillground),
         ("--caves", args.caves),
@@ -3642,6 +3653,17 @@ fn gui_start_generation(
                             overture::OvertureData::default()
                         }
                     });
+                    let detail_handle = s.spawn(|| {
+                        if args.overture_detail && !args.skip_objects() {
+                            overture::fetch_overture_detail(
+                                &bbox,
+                                &crate::projection::ProjectionSpec::from_args(&args),
+                                args.debug,
+                            )
+                        } else {
+                            overture::OvertureDetailData::default()
+                        }
+                    });
                     let ground_handle = s.spawn(|| {
                         in_pool(run_pool.as_deref(), || {
                             ground::generate_ground_data(&args, bbox, &peaks)
@@ -3678,6 +3700,12 @@ fn gui_start_generation(
                         eprintln!("Overture fetch failed, continuing without Overture buildings.");
                         overture::OvertureData::default()
                     });
+                    let overture_detail = detail_handle.join().unwrap_or_else(|_| {
+                        eprintln!(
+                            "Overture roads and places failed, continuing with OpenStreetMap only."
+                        );
+                        overture::OvertureDetailData::default()
+                    });
                     if let (Some(tx), Ok(raw)) = (&peak_tx, fetch_result.as_ref()) {
                         if crate::elevation::TerrainHints::wants_overture(&args) {
                             let _ = tx.send(crate::elevation::TerrainHints::from_overture(
@@ -3690,10 +3718,15 @@ fn gui_start_generation(
                     drop(peak_tx);
                     // The error as its text, which is all that is read of it, so it can cross threads.
                     let fetch_result = fetch_result.map_err(|e| e.to_string());
-                    (fetch_result, overture_data, ground_handle.join().ok())
+                    (
+                        fetch_result,
+                        overture_data,
+                        overture_detail,
+                        ground_handle.join().ok(),
+                    )
                 })
             };
-            let (fetch_result, overture_data, ground) = off_worker(fetch_all);
+            let (fetch_result, overture_data, overture_detail, ground) = off_worker(fetch_all);
 
             offline_complete()?;
             let Some(ground) = ground else {
@@ -3753,6 +3786,7 @@ fn gui_start_generation(
                         args.overture && !args.skip_objects(),
                         args.scale,
                     );
+                    overture::merge_detail(&mut parsed_elements, overture_detail);
 
                     osm_parser::sort_by_priority(&mut parsed_elements);
 
@@ -4297,6 +4331,44 @@ mod tests {
         assert!(window_flag_args(&y, false, "bedrock", true).is_err());
     }
 
+    /// China Province is one source flag; it never travels with an older PBF source beside it.
+    #[test]
+    fn the_window_passes_a_single_china_province_source() {
+        let extra =
+            window_flag_args(&["--china-province=beijing".into()], false, "java", true).unwrap();
+        assert_eq!(
+            extra.china_province,
+            Some(crate::args::ChinaProvince::Beijing)
+        );
+        assert!(extra.osm_pbf.is_none() && extra.osm_pbf_url.is_none());
+        assert!(window_flag_args(
+            &[
+                "--china-province=beijing".into(),
+                "--osm-pbf=geofabrik".into()
+            ],
+            false,
+            "java",
+            true
+        )
+        .is_err());
+    }
+
+    /// China Nationwide is one flag on its own, with no province or older PBF source beside it.
+    #[test]
+    fn the_window_passes_the_china_national_source() {
+        let extra = window_flag_args(&["--china-national".into()], false, "java", true).unwrap();
+        assert!(extra.china_national);
+        assert!(extra.china_province.is_none());
+        assert!(extra.osm_pbf.is_none() && extra.osm_pbf_url.is_none());
+        assert!(window_flag_args(
+            &["--china-national".into(), "--china-province=beijing".into()],
+            false,
+            "java",
+            true
+        )
+        .is_err());
+    }
+
     /// The window draws the plan the job would run, from the same flags, and writes nothing.
     #[test]
     fn the_window_plans_the_job_it_would_run() {
@@ -4380,13 +4452,19 @@ mod tests {
             "--one-world-workers=2",
             "--seed=7",
             "--road-detail=clean",
+            "--overture-detail=true",
             "--no-buildings",
             "--only-pieces=2,3",
         ]
         .map(String::from)
         .to_vec();
         let extra = window_flag_args(&flags, true, "java", false).unwrap();
-        assert!(extra.units.coordinates() && !extra.buildings && extra.seed == Some(7));
+        assert!(
+            extra.units.coordinates()
+                && !extra.buildings
+                && extra.seed == Some(7)
+                && extra.overture_detail
+        );
         // Pieces are a One World feature: elsewhere the job flags are dropped.
         let solo = window_flag_args(&flags, false, "java", true).unwrap();
         assert!(!solo.units.coordinates() && solo.units.only_pieces.is_none());
@@ -4401,6 +4479,7 @@ mod tests {
             Args::try_parse_from(std::iter::once(std::ffi::OsString::from("arnis")).chain(argv))
                 .unwrap();
         assert_eq!((back.scale, back.winter, back.seed), (2.0, true, Some(7)));
+        assert!(back.overture_detail);
         assert_eq!(back.world_name.as_deref(), Some("World"));
         // The token goes to the pieces in their environment, never on a command line.
         args.mapillary_token = Some("MLY|secret".into());

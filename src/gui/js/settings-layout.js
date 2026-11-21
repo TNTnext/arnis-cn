@@ -209,7 +209,9 @@ const SEARCH_WORDS = {
   'meld-climate-mode-group': 'biomes desert snow',
   'meld-offline-toggle': 'no internet network cache',
   'meld-overpass-input': 'server osm',
-  'meld-osm-source-group': 'openstreetmap data geofabrik',
+  'meld-osm-source-group': 'openstreetmap data geofabrik china nationwide province source',
+  'meld-detail-data-group': 'detailed detail overture roads railways places poi shop school hospital station monthly recent 详细 数据 道路 地点',
+  'meld-china-province-select': 'china province beijing shanghai osm france 中国 省',
   'meld-origin-input': 'coordinates latitude longitude',
 };
 

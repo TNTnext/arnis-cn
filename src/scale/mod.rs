@@ -785,7 +785,11 @@ pub fn run_with(
         match crate::osm_pbf::bake_for_job(&src, bake_area) {
             Err(e) if crate::osm_pbf::fallback_allowed(&src, crate::net::offline()) => {
                 crate::retrieve_data::warn_region_download_fallback(&e);
-                argv = without_options(argv, &["--osm-pbf", "--osm-pbf-url"], &[]);
+                argv = without_options(
+                    argv,
+                    &["--osm-pbf", "--osm-pbf-url", "--china-province"],
+                    &[],
+                );
             }
             r => r?,
         }

@@ -408,6 +408,12 @@
   "meld_blinear_level_desc": "B_Linear-ის რეგიონების შეკუმშვის დონე.",
   "meld_osm_source": "OSM-ის მონაცემთა წყარო",
   "meld_osm_source_desc": "რუკის მონაცემების წარმოშობა.",
+  "detail_data": "Detailed Map Data",
+  "detail_data_desc": "Keep the standard map or add recent Overture roads and places.",
+  "detail_data_standard": "Standard",
+  "detail_data_overture": "Overture Monthly Detail",
+  "detail_data_tip": "Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.",
+  "data_source_overture_detail": "Roads and places",
   "meld_archive_folder": "არქივის საქაღალდე",
   "meld_archive_folder_desc": "ლოკალური ფილების არქივის საქაღალდე. ექსპერიმენტული.",
   "meld_pbf_url": "ექსტრაქტის URL",
@@ -876,5 +882,13 @@
   "lidar_limit": "ჩამოტვირთვის ლიმიტი",
   "lidar_limit_desc": "მაქსიმუმი, რასაც ერთი გაშვება ჩამოტვირთავს.",
   "lidar_limit_tip": "მაქსიმუმი, რასაც ერთი გაშვება ჩამოტვირთავს ლაზერული მონაცემებისთვის. ქეშირებული არ ითვლება. მის ზემოთ გაშვება მათ გარეშე გრძელდება. ერთი კმ² დაახლოებით 100–300 მბ-ია.",
-  "lidar_over_limit": "ლაზერული მონაცემები გამოტოვებულია: ტერიტორიას სჭირდება დაახლოებით {mb} MB, რაც აღემატება ლიმიტს „ჩამოტვირთვის ლიმიტი“ ({limit} MB). გაზარდეთ აქ: პარამეტრები > დამატებითი > ლაზერული მონაცემები."
+  "lidar_over_limit": "ლაზერული მონაცემები გამოტოვებულია: ტერიტორიას სჭირდება დაახლოებით {mb} MB, რაც აღემატება ლიმიტს „ჩამოტვირთვის ლიმიტი“ ({limit} MB). გაზარდეთ აქ: პარამეტრები > დამატებითი > ლაზერული მონაცემები.",
+    "meld_osm_source_china_national": "China Nationwide",
+    "meld_osm_source_china": "China Province",
+  "meld_china_province": "China Province",
+  "meld_china_province_desc": "Use the province-level OpenStreetMap source for China.",
+  "placeholder_meld_china_province": "Choose a province",
+  "reason_china": "Pick China Province as the OSM Data Source.",
+  "meld_china_province_required": "Choose a China province first.",
+  "meld_china_province_tip": "Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices."
 }

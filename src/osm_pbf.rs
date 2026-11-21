@@ -21,6 +21,13 @@ use std::time::{Duration, Instant};
 
 /// `--osm-pbf geofabrik`: the extract is picked from the selection and downloaded.
 pub const GEOFABRIK: &str = "geofabrik";
+/// `--china-province`: the chosen province extract is downloaded from OpenStreetMap France.
+pub const CHINA: &str = "china";
+/// `--china-national`: the complete China extract from OpenStreetMap France.
+pub const CHINA_NATIONAL: &str = "china-national";
+pub const CHINA_PBF_BASE: &str = "https://download.openstreetmap.fr/extracts/asia/china/";
+pub const CHINA_NATIONAL_PBF_URL: &str =
+    "https://download.openstreetmap.fr/extracts/asia/china-latest.osm.pbf";
 const GEOFABRIK_INDEX_URL: &str = "https://download.geofabrik.de/index-v1.json";
 /// Extract borders move over years; a week-old index names the same files.
 const INDEX_MAX_AGE: Duration = Duration::from_secs(7 * 86_400);
@@ -37,18 +44,33 @@ pub struct Source {
 
 impl Source {
     pub fn from_args(args: &Args) -> Option<Self> {
+        let pad_m = f64::from(crate::one_world::CLIP_PAD_BLOCKS) / args.scale.max(1e-6);
+        if args.china_national {
+            return Some(Source {
+                spec: CHINA_NATIONAL.into(),
+                url: Some(CHINA_NATIONAL_PBF_URL.into()),
+                pad_m,
+            });
+        }
+        if let Some(province) = args.china_province {
+            return Some(Source {
+                spec: CHINA.into(),
+                url: Some(province.url()),
+                pad_m,
+            });
+        }
         args.osm_pbf.as_ref().map(|spec| Source {
             spec: spec.clone(),
             url: args.osm_pbf_url.clone(),
-            pad_m: f64::from(crate::one_world::CLIP_PAD_BLOCKS) / args.scale.max(1e-6),
+            pad_m,
         })
     }
 }
 
-/// A failed Geofabrik download may fall back to the default source; a file the user
+/// A failed online extract download may fall back to the default source; a file the user
 /// named, or `--offline`, keeps the error.
 pub fn fallback_allowed(src: &Source, offline: bool) -> bool {
-    src.spec == GEOFABRIK && !offline
+    matches!(src.spec.as_str(), GEOFABRIK | CHINA | CHINA_NATIONAL) && !offline
 }
 
 /// The OSM data of `bbox`, cut from a bake that covers it, or from the extract.
@@ -152,6 +174,55 @@ pub fn plan(root: &Path, src: &Source, selection: LLBBox) -> ExtractPlan {
     let want = E7Box::around(&selection, src.pad_m);
     let mut url_of = None;
     let mut share = None;
+    if matches!(src.spec.as_str(), CHINA | CHINA_NATIONAL) {
+        let selection_share = if src.spec == CHINA_NATIONAL {
+            // China's land area, used only to keep the disk estimate proportionate
+            // when a small selection is cut from the national extract.
+            Some(want.area_deg2() * 111.0 * 111.0 / 9_600_000.0)
+        } else {
+            None
+        };
+        let Some(url) = src.url.clone() else {
+            return ExtractPlan::default();
+        };
+        let Some(dest) = download_path(&cache, &url) else {
+            return ExtractPlan::default();
+        };
+        let name = download_name(&url).map(|n| extract_label(Path::new(n)));
+        url_of = Some(url);
+        share = selection_share;
+        let bytes = std::fs::metadata(&dest)
+            .ok()
+            .filter(|m| m.is_file())
+            .map(|m| m.len());
+        let bake = bytes
+            .and_then(|_| pbf_key(&dest).ok())
+            .and_then(|key| find_bake(&cache.join("bakes").join(key), &want))
+            .map(|(path, _)| path);
+        let bake_bytes = bake
+            .and_then(|b| std::fs::metadata(b).ok())
+            .map(|m| m.len());
+        let download_bytes = bytes.or_else(|| {
+            let name = dest.file_name()?.to_string_lossy().into_owned();
+            read_sizes(dest.parent()?)
+                .get(&name)
+                .copied()
+                .filter(|&b| b > 0)
+        });
+        return ExtractPlan {
+            name,
+            bytes,
+            downloaded: bytes.is_some(),
+            baked: bake_bytes.is_some(),
+            url: url_of,
+            download_bytes,
+            bake_bytes,
+            bake_estimate: download_bytes
+                .zip(share)
+                .map(|(pbf, share)| crate::data_plan::region_bake_bytes(pbf, share)),
+            ram_estimate: download_bytes.map(crate::data_plan::bake_ram_bytes),
+        };
+    }
     let (name, pbf) = if src.spec == GEOFABRIK {
         let index = std::fs::read(cache.join("geofabrik-index.json"))
             .ok()
@@ -323,8 +394,21 @@ fn pbf_key(pbf: &Path) -> Result<String> {
 
 // ── the extract ───────────────────────────────────────────────────────────────
 
-/// The extract on disk, downloaded first for `geofabrik`.
+/// The extract on disk, downloaded first for `geofabrik`, `china` and
+/// `china-national`.
 fn locate(src: &Source, want: &E7Box) -> Result<PathBuf> {
+    if matches!(src.spec.as_str(), CHINA | CHINA_NATIONAL) {
+        let url = src
+            .url
+            .as_deref()
+            .ok_or_else(|| format!("{} has no download URL", src.spec))?;
+        let dest =
+            download_path(&cache_root()?, url).ok_or_else(|| format!("not a .pbf url: {url}"))?;
+        if !downloaded_whole(&dest) {
+            download(url, &dest, None)?;
+        }
+        return Ok(dest);
+    }
     if src.spec != GEOFABRIK {
         let p = PathBuf::from(&src.spec);
         return if p.is_file() {
@@ -1454,7 +1538,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fallback_only_for_geofabrik_online() {
+    fn fallback_only_for_an_online_extract() {
         let src = |spec: &str| Source {
             spec: spec.into(),
             url: None,
@@ -1462,11 +1546,15 @@ mod tests {
         };
         assert!(fallback_allowed(&src(GEOFABRIK), false));
         assert!(!fallback_allowed(&src(GEOFABRIK), true));
+        assert!(fallback_allowed(&src(CHINA), false));
+        assert!(!fallback_allowed(&src(CHINA), true));
+        assert!(fallback_allowed(&src(CHINA_NATIONAL), false));
+        assert!(!fallback_allowed(&src(CHINA_NATIONAL), true));
         assert!(!fallback_allowed(&src("berlin.osm.pbf"), false));
     }
 
     #[test]
-    fn an_empty_cut_falls_back_only_for_geofabrik() {
+    fn an_empty_cut_falls_back_only_for_an_online_extract() {
         // Held by the tests that switch --offline on, which changes the answer.
         let _net = crate::net::PERMIT_TEST_LOCK
             .lock()
@@ -1480,7 +1568,92 @@ mod tests {
             pad_m: 0.0,
         };
         assert!(no_data(&src(GEOFABRIK)).is_err());
+        assert!(no_data(&src(CHINA)).is_err());
+        assert!(no_data(&src(CHINA_NATIONAL)).is_err());
         assert!(no_data(&src("berlin.osm.pbf")).is_ok());
+    }
+
+    #[test]
+    fn china_provinces_map_to_their_extract_files() {
+        use clap::Parser;
+        let args = Args::try_parse_from(["arnis", "--china-province=beijing"]).unwrap();
+        let src = Source::from_args(&args).unwrap();
+        assert_eq!(src.spec, CHINA);
+        assert_eq!(
+            src.url.as_deref(),
+            Some("https://download.openstreetmap.fr/extracts/asia/china/beijing-latest.osm.pbf")
+        );
+        assert_eq!(src.pad_m, f64::from(crate::one_world::CLIP_PAD_BLOCKS));
+
+        let hong_kong = Args::try_parse_from(["arnis", "--china-province=hong-kong"]).unwrap();
+        assert_eq!(hong_kong.china_province.unwrap().slug(), "hong_kong");
+        let inner_mongolia =
+            Args::try_parse_from(["arnis", "--china-province=inner-mongolia"]).unwrap();
+        assert_eq!(
+            inner_mongolia.china_province.unwrap().slug(),
+            "inner_mongolia"
+        );
+    }
+
+    #[test]
+    fn china_national_uses_the_complete_country_extract() {
+        use clap::Parser;
+        let args = Args::try_parse_from(["arnis", "--china-national"]).unwrap();
+        let src = Source::from_args(&args).unwrap();
+        assert_eq!(src.spec, CHINA_NATIONAL);
+        assert_eq!(src.url.as_deref(), Some(CHINA_NATIONAL_PBF_URL));
+        assert_eq!(src.pad_m, f64::from(crate::one_world::CLIP_PAD_BLOCKS));
+
+        assert!(
+            Args::try_parse_from(["arnis", "--china-national", "--china-province=beijing"])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_national_china_plan_names_the_country_extract_before_download() {
+        use clap::Parser;
+        let args = Args::try_parse_from(["arnis", "--china-national"]).unwrap();
+        let src = Source::from_args(&args).unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "arnis-china-national-plan-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let p = plan(
+            &root,
+            &src,
+            LLBBox::new(39.90, 116.40, 39.91, 116.41).unwrap(),
+        );
+        assert_eq!(p.name.as_deref(), Some("china"));
+        assert_eq!(p.url.as_deref(), Some(CHINA_NATIONAL_PBF_URL));
+        assert!(!p.downloaded && !p.baked);
+    }
+
+    #[test]
+    fn a_china_plan_names_its_province_extract_before_download() {
+        use clap::Parser;
+        let args = Args::try_parse_from(["arnis", "--china-province=beijing"]).unwrap();
+        let src = Source::from_args(&args).unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "arnis-china-plan-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let p = plan(
+            &root,
+            &src,
+            LLBBox::new(39.90, 116.40, 39.91, 116.41).unwrap(),
+        );
+        assert_eq!(p.name.as_deref(), Some("beijing"));
+        assert_eq!(p.url.as_deref(), src.url.as_deref());
+        assert!(!p.downloaded && !p.baked);
     }
 
     #[test]

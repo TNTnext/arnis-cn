@@ -894,11 +894,17 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
 
     // OSM, Overture and elevation/land-cover fetches only need the bbox, so run them in parallel.
     if args.overture && !skip_objects {
-        println!("{} Fetching Overture Maps data...", "  [+]".bold());
+        println!("{} Fetching Overture Maps buildings...", "  [+]".bold());
+    }
+    if args.overture_detail && !skip_objects {
+        println!(
+            "{} Fetching Overture Maps roads and places...",
+            "  [+]".bold()
+        );
     }
     let fetch_start = std::time::Instant::now();
     let (peak_tx, peaks) = crate::elevation::PeakSource::channel();
-    let (raw_data, overture_data, mut ground) = std::thread::scope(|s| {
+    let (raw_data, overture_data, overture_detail, mut ground) = std::thread::scope(|s| {
         // Owned here, so a panic below drops it and the terrain thread stops waiting.
         let peak_tx = peak_tx;
         let overture_handle = s.spawn(|| {
@@ -912,6 +918,19 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
                 )
             } else {
                 overture::OvertureData::default()
+            };
+            (data, t.elapsed())
+        });
+        let detail_handle = s.spawn(|| {
+            let t = std::time::Instant::now();
+            let data = if args.overture_detail && !skip_objects {
+                overture::fetch_overture_detail(
+                    &effective_bbox,
+                    &projection::ProjectionSpec::from_args(&args),
+                    args.debug,
+                )
+            } else {
+                overture::OvertureDetailData::default()
             };
             (data, t.elapsed())
         });
@@ -972,6 +991,17 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
             (overture::OvertureData::default(), std::time::Duration::ZERO)
         });
         bench.report("overture_fetch", overture_dur);
+        let (overture_detail, detail_dur) = detail_handle.join().unwrap_or_else(|_| {
+            eprintln!(
+                "{} Overture roads and places failed, continuing with OpenStreetMap only.",
+                "Warning:".yellow().bold()
+            );
+            (
+                overture::OvertureDetailData::default(),
+                std::time::Duration::ZERO,
+            )
+        });
+        bench.report("overture_detail_fetch", detail_dur);
         if crate::elevation::TerrainHints::wants_overture(&args) {
             let _ = peak_tx.send(crate::elevation::TerrainHints::from_overture(
                 &raw_data,
@@ -987,7 +1017,7 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
         });
         bench.report("terrain_total", ground_dur);
 
-        (raw_data, overture_data, ground)
+        (raw_data, overture_data, overture_detail, ground)
     });
     bench.report("fetch_total", fetch_start.elapsed());
     bench.reset();
@@ -1074,6 +1104,7 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
         args.overture && !skip_objects,
         args.scale,
     );
+    overture::merge_detail(&mut parsed_elements, overture_detail);
 
     osm_parser::sort_by_priority(&mut parsed_elements);
     bench.mark("sort_priority");

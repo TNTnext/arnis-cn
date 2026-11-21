@@ -241,6 +241,12 @@ pub struct Args {
     #[arg(long = "overture", default_value_t = true, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub overture: bool,
 
+    /// Add monthly Overture Maps road, railway and named-place data on top of OpenStreetMap.
+    /// This reads only the vector tiles touching the selected area. Places can fill in named
+    /// shops, schools, hospitals and stations in smaller Chinese cities and counties.
+    #[arg(long = "overture-detail", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
+    pub overture_detail: bool,
+
     /// Which Overture transport to read. Both carry the same buildings.
     /// auto: vector tiles, falling back to the Parquet partitions (default)
     /// tiles: vector tiles only, so a fallback cannot hide a broken archive
@@ -703,6 +709,25 @@ pub struct Args {
     #[arg(long, value_name = "URL", requires = "osm_pbf")]
     pub osm_pbf_url: Option<String>,
 
+    /// Read OpenStreetMap from OpenStreetMap France's China province extracts instead of the
+    /// tile archive. The province is downloaded once, cached, and cut locally.
+    #[arg(
+        long,
+        value_enum,
+        value_name = "PROVINCE",
+        conflicts_with_all = ["file", "osm_pbf", "osm_pbf_url", "china_national"]
+    )]
+    pub china_province: Option<ChinaProvince>,
+
+    /// Read OpenStreetMap from OpenStreetMap France's complete China extract instead of the
+    /// tile archive. The national file is downloaded once, cached, and cut locally.
+    #[arg(
+        long,
+        default_value_t = false,
+        conflicts_with_all = ["file", "osm_pbf", "osm_pbf_url"]
+    )]
+    pub china_national: bool,
+
     /// Overpass server(s) to use in place of Arnis's own, tried in order; repeat the flag or separate with commas. The tile archive is still read first and these are its fallback; with --no-tile-archive they are the primary source.
     #[arg(
         long,
@@ -723,6 +748,130 @@ pub struct Args {
     /// With --unit-regions, warm the caches for every piece, one at a time, before the pieces start building.
     #[arg(long, conflicts_with = "offline")]
     pub prewarm_first: bool,
+}
+
+/// A province-level extract in OpenStreetMap France's China directory.
+///
+/// The values are the names accepted by `--china-province`; `slug` is the file-name stem used
+/// by the download mirror. Hong Kong and Macau are included as separate regions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum ChinaProvince {
+    #[value(name = "anhui")]
+    Anhui,
+    #[value(name = "beijing")]
+    Beijing,
+    #[value(name = "chongqing")]
+    Chongqing,
+    #[value(name = "fujian")]
+    Fujian,
+    #[value(name = "gansu")]
+    Gansu,
+    #[value(name = "guangdong")]
+    Guangdong,
+    #[value(name = "guangxi")]
+    Guangxi,
+    #[value(name = "guizhou")]
+    Guizhou,
+    #[value(name = "hainan")]
+    Hainan,
+    #[value(name = "hebei")]
+    Hebei,
+    #[value(name = "heilongjiang")]
+    Heilongjiang,
+    #[value(name = "henan")]
+    Henan,
+    #[value(name = "hong-kong")]
+    HongKong,
+    #[value(name = "hubei")]
+    Hubei,
+    #[value(name = "hunan")]
+    Hunan,
+    #[value(name = "inner-mongolia")]
+    InnerMongolia,
+    #[value(name = "jiangsu")]
+    Jiangsu,
+    #[value(name = "jiangxi")]
+    Jiangxi,
+    #[value(name = "jilin")]
+    Jilin,
+    #[value(name = "liaoning")]
+    Liaoning,
+    #[value(name = "macau")]
+    Macau,
+    #[value(name = "ningxia")]
+    Ningxia,
+    #[value(name = "qinghai")]
+    Qinghai,
+    #[value(name = "shaanxi")]
+    Shaanxi,
+    #[value(name = "shandong")]
+    Shandong,
+    #[value(name = "shanghai")]
+    Shanghai,
+    #[value(name = "shanxi")]
+    Shanxi,
+    #[value(name = "sichuan")]
+    Sichuan,
+    #[value(name = "tianjin")]
+    Tianjin,
+    #[value(name = "tibet")]
+    Tibet,
+    #[value(name = "xinjiang")]
+    Xinjiang,
+    #[value(name = "yunnan")]
+    Yunnan,
+    #[value(name = "zhejiang")]
+    Zhejiang,
+}
+
+impl ChinaProvince {
+    /// The stem used by `{stem}-latest.osm.pbf` on OpenStreetMap France.
+    pub fn slug(self) -> &'static str {
+        match self {
+            Self::Anhui => "anhui",
+            Self::Beijing => "beijing",
+            Self::Chongqing => "chongqing",
+            Self::Fujian => "fujian",
+            Self::Gansu => "gansu",
+            Self::Guangdong => "guangdong",
+            Self::Guangxi => "guangxi",
+            Self::Guizhou => "guizhou",
+            Self::Hainan => "hainan",
+            Self::Hebei => "hebei",
+            Self::Heilongjiang => "heilongjiang",
+            Self::Henan => "henan",
+            Self::HongKong => "hong_kong",
+            Self::Hubei => "hubei",
+            Self::Hunan => "hunan",
+            Self::InnerMongolia => "inner_mongolia",
+            Self::Jiangsu => "jiangsu",
+            Self::Jiangxi => "jiangxi",
+            Self::Jilin => "jilin",
+            Self::Liaoning => "liaoning",
+            Self::Macau => "macau",
+            Self::Ningxia => "ningxia",
+            Self::Qinghai => "qinghai",
+            Self::Shaanxi => "shaanxi",
+            Self::Shandong => "shandong",
+            Self::Shanghai => "shanghai",
+            Self::Shanxi => "shanxi",
+            Self::Sichuan => "sichuan",
+            Self::Tianjin => "tianjin",
+            Self::Tibet => "tibet",
+            Self::Xinjiang => "xinjiang",
+            Self::Yunnan => "yunnan",
+            Self::Zhejiang => "zhejiang",
+        }
+    }
+
+    /// The current province extract URL. The mirror's `-latest` file is updated daily.
+    pub fn url(self) -> String {
+        format!(
+            "{}{}-latest.osm.pbf",
+            crate::osm_pbf::CHINA_PBF_BASE,
+            self.slug()
+        )
+    }
 }
 
 /// Water options. Off unless asked for, so the GUI runs on `WaterArgs::default()`.
@@ -1072,6 +1221,9 @@ pub fn refuse_live_extras(args: &Args) -> Result<(), String> {
         (args.dump_loot_table.is_some(), "--dump-loot-table"),
         (args.osm_pbf.is_some(), "--osm-pbf"),
         (args.osm_pbf_url.is_some(), "--osm-pbf-url"),
+        (args.china_province.is_some(), "--china-province"),
+        (args.china_national, "--china-national"),
+        (args.overture_detail, "--overture-detail"),
         (!args.overpass_url.is_empty(), "--overpass-url"),
         (args.offline, "--offline"),
         (args.prewarm, "--prewarm"),
@@ -1655,6 +1807,7 @@ pub fn apply_body_defaults(args: &mut Args) {
     args.scale = args.body.world_scale();
     args.mode = GenerationMode::TerrainOnly;
     args.overture = false;
+    args.overture_detail = false;
     args.canopy_height = false;
     args.use_3d = false;
     args.interior = false;
@@ -2739,6 +2892,7 @@ mod tests {
         // interior is opt-in (off by default); overture defaults to true
         assert!(!args.interior);
         assert!(args.overture);
+        assert!(!args.overture_detail);
     }
 
     #[test]
@@ -2769,10 +2923,12 @@ mod tests {
             "1,2,3,4",
             "--interior",
             "--overture",
+            "--overture-detail",
         ];
         let args = Args::parse_from(cmd.iter());
         assert!(args.interior);
         assert!(args.overture);
+        assert!(args.overture_detail);
     }
 
     #[test]

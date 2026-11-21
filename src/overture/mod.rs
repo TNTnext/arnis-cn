@@ -26,12 +26,16 @@
 //! and never needs revalidating.
 
 mod cache;
+mod detail;
 mod mvt;
 pub(crate) mod pmtiles;
 mod tiles;
 pub(crate) use tiles::cache_files as tile_cache_files;
 
 pub use cache::{cache_root, clear_overture_cache};
+pub use detail::{
+    cache_files as detail_cache_files, fetch_overture_detail, merge_detail, OvertureDetailData,
+};
 
 /// What a fetch actually cost, so the two transports can be compared on
 /// measurement rather than on the docstrings above.
@@ -98,7 +102,7 @@ const OVERTURE_RELEASE_LIST_URL: &str =
 /// this constant rots: it is tried *after* the release that last worked here
 /// (see [`cache::last_good_release`]) precisely so a stale value costs nothing
 /// on a machine that has fetched before. Bump it when cutting a release.
-const OVERTURE_STAC_RELEASE_FALLBACK: &str = "2026-08-19.0";
+const OVERTURE_STAC_RELEASE_FALLBACK: &str = "2026-11-18.0";
 
 /// How many releases to request before giving up, so a broken host cannot stall
 /// the fetch. Spent on at most two discovered releases plus the two fallbacks
@@ -1370,7 +1374,7 @@ pub(crate) fn shared_releases_env() -> Option<(&'static str, String)> {
 /// data on this machine, and finally the compile-time constant. That ordering is
 /// the point - the constant is a date, dates rot, and a machine that has fetched
 /// before already knows a better answer than a constant baked in months ago.
-fn release_candidates(client: &Client, debug: bool) -> Vec<String> {
+pub(super) fn release_candidates(client: &Client, debug: bool) -> Vec<String> {
     let discovered = match discover_releases(client) {
         Ok(releases) => releases,
         Err(e) => {

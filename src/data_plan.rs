@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 /// One data source of the run.
 #[derive(serde::Serialize, Debug, PartialEq)]
 pub struct Item {
-    /// `osm`, `elevation`, `land_cover` or `overture`.
+    /// `osm`, `elevation`, `land_cover`, `overture` or `overture_detail`.
     pub source: &'static str,
     pub cached: usize,
     /// What the cached files take on disk.
@@ -102,6 +102,7 @@ const TYPICAL_OSM_TILE: u64 = 240_000;
 const TYPICAL_ELEVATION_TILE: u64 = 72_000;
 const TYPICAL_LAND_COVER_TILE: u64 = 38_000;
 const TYPICAL_OVERTURE_TILE: u64 = 142_000;
+const TYPICAL_OVERTURE_DETAIL_TILE: u64 = 180_000;
 
 fn count(source: &'static str, files: Option<Vec<PathBuf>>, typical: u64) -> Item {
     let files = files.unwrap_or_default();
@@ -256,6 +257,14 @@ pub fn plan(root: &Path, args: &Args, bbox: LLBBox) -> DataPlan {
         out.items
             .push(count("overture", files, TYPICAL_OVERTURE_TILE));
     }
+    if args.overture_detail && !args.skip_objects() {
+        let files = crate::overture::detail_cache_files(root, &bbox);
+        out.items.push(count(
+            "overture_detail",
+            files,
+            TYPICAL_OVERTURE_DETAIL_TILE,
+        ));
+    }
     out
 }
 
@@ -360,6 +369,38 @@ mod tests {
         assert_eq!(item(&p, "osm").cached, 1, "downloaded, not baked");
         assert_eq!(item(&p, "osm").cached_bytes, 4321);
         assert!(p.free_bytes.is_some_and(|b| b > 0));
+
+        // China Nationwide is the complete-country extract, read through the
+        // same local bake and offline cache path as a province.
+        let national = plan(root, &args(&["--china-national"]), bbox);
+        let china = national.extract.as_ref().unwrap();
+        assert_eq!(china.name.as_deref(), Some("china"));
+        assert_eq!(
+            china.url.as_deref(),
+            Some(crate::osm_pbf::CHINA_NATIONAL_PBF_URL)
+        );
+        assert_eq!(item(&national, "osm").total, 2);
+
+        // Detailed Overture roads and places are a separate plan item. It needs both
+        // monthly theme archives and reads only the z14 tiles touching the area.
+        let detail_flag = args(&["--overture-detail"]);
+        assert_eq!(
+            item(&plan(root, &detail_flag, bbox), "overture_detail").total,
+            0,
+            "no accepted release yet"
+        );
+        let overture = root.join("arnis-overture-cache");
+        std::fs::create_dir_all(&overture).unwrap();
+        std::fs::write(overture.join("last_good_release"), "2026-11-18.0").unwrap();
+        let detail = plan(root, &detail_flag, bbox);
+        let detail_item = item(&detail, "overture_detail");
+        assert!(detail_item.total > 0 && detail_item.total % 2 == 0);
+        assert_eq!(detail_item.cached, 0);
+        let files = crate::overture::detail_cache_files(root, &bbox).unwrap();
+        touch(&files[0], 321);
+        let detail = plan(root, &detail_flag, bbox);
+        assert_eq!(item(&detail, "overture_detail").cached, 1);
+        assert_eq!(item(&detail, "overture_detail").cached_bytes, 321);
 
         // Local Archive: the folder's cells, nothing to download.
         let local = root.join("local-archive");

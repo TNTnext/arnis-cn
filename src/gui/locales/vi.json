@@ -408,6 +408,12 @@
   "meld_blinear_level_desc": "Mức nén của các region B_Linear.",
   "meld_osm_source": "Nguồn dữ liệu OSM",
   "meld_osm_source_desc": "Nơi lấy dữ liệu bản đồ.",
+  "detail_data": "Detailed Map Data",
+  "detail_data_desc": "Keep the standard map or add recent Overture roads and places.",
+  "detail_data_standard": "Standard",
+  "detail_data_overture": "Overture Monthly Detail",
+  "detail_data_tip": "Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.",
+  "data_source_overture_detail": "Roads and places",
   "meld_archive_folder": "Thư mục lưu trữ",
   "meld_archive_folder_desc": "Thư mục của kho ô bản đồ cục bộ. Thử nghiệm.",
   "meld_pbf_url": "URL bản trích xuất",
@@ -876,5 +882,13 @@
   "lidar_limit": "Giới hạn tải về",
   "lidar_limit_desc": "Lượng dữ liệu laser tối đa một lần tạo tải về.",
   "lidar_limit_tip": "Lượng dữ liệu laser tối đa một lần tạo tải về. Dữ liệu đã lưu đệm không tính. Vượt quá thì tiếp tục mà không có chúng. Một km² khoảng 100–300 MB.",
-  "lidar_over_limit": "Đã bỏ qua dữ liệu laser: khu vực cần khoảng {mb} MB, vượt Giới hạn tải về {limit} MB. Tăng giới hạn trong Cài đặt > Nâng cao > Dữ liệu laser."
+  "lidar_over_limit": "Đã bỏ qua dữ liệu laser: khu vực cần khoảng {mb} MB, vượt Giới hạn tải về {limit} MB. Tăng giới hạn trong Cài đặt > Nâng cao > Dữ liệu laser.",
+    "meld_osm_source_china_national": "China Nationwide",
+    "meld_osm_source_china": "China Province",
+  "meld_china_province": "China Province",
+  "meld_china_province_desc": "Use the province-level OpenStreetMap source for China.",
+  "placeholder_meld_china_province": "Choose a province",
+  "reason_china": "Pick China Province as the OSM Data Source.",
+  "meld_china_province_required": "Choose a China province first.",
+  "meld_china_province_tip": "Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices."
 }

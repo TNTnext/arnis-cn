@@ -1424,13 +1424,76 @@
                     <svg class="icon setting-icon" aria-hidden="true"><use href="#i-download"></use></svg>
                     <span class="setting-text">
                       <span class="setting-heading">
-                        <span data-localize="meld_osm_source">OSM Data Source</span><span class="tooltip-icon" data-tooltip-key="meld_osm_source_tip" data-tooltip="Default reads Arnis&#x27;s tile archive. Local Archive reads a folder of tiles baked on this computer (Experimental: the bake makes an older archive format, so it is sparser than the public tiles; needs arnis-tiles). Region Download fetches the smallest Geofabrik extract holding the area and cuts it locally.">?</span>
+                        <span data-localize="meld_osm_source">OSM Data Source</span><span class="tooltip-icon" data-tooltip-key="meld_osm_source_tip" data-tooltip="Default reads Arnis&#x27;s tile archive. China Nationwide downloads the complete OpenStreetMap France China extract (about 1.7 GB), caches it, and cuts the selected area locally. China Province downloads one province instead. Local Archive reads a folder of tiles baked on this computer (Experimental: the bake makes an older archive format, so it is sparser than the public tiles; needs arnis-tiles). Region Download fetches the smallest Geofabrik extract holding the area and cuts it locally.">?</span>
                       </span>
                       <span class="setting-desc" data-localize="meld_osm_source_desc">Where the map data comes from.</span>
                     </span>
                   </label>
                   <div class="settings-control">
-                    <div class="segmented-control" id="meld-osm-source-group"><button type="button" class="segment active" data-default data-v="default" data-localize="meld_osm_source_default">Default</button><button type="button" class="segment" data-v="archive" data-localize="meld_osm_source_archive">Local Archive (Experimental)</button><button type="button" class="segment" data-v="region" data-localize="meld_osm_source_region">Region Download (Experimental)</button></div>
+                    <div class="segmented-control" id="meld-osm-source-group"><button type="button" class="segment active" data-default data-v="default" data-localize="meld_osm_source_default">Default</button><button type="button" class="segment" data-v="china-national" data-localize="meld_osm_source_china_national">China Nationwide</button><button type="button" class="segment" data-v="china" data-localize="meld_osm_source_china">China Province</button><button type="button" class="segment" data-v="archive" data-localize="meld_osm_source_archive">Local Archive (Experimental)</button><button type="button" class="segment" data-v="region" data-localize="meld_osm_source_region">Region Download (Experimental)</button></div>
+                  </div>
+                </div>
+                <div class="settings-row setting-tile is-wide meld-only">
+                  <label class="setting-label">
+                    <svg class="icon setting-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+                    <span class="setting-text">
+                      <span class="setting-heading">
+                        <span data-localize="detail_data">Detailed Map Data</span><span class="tooltip-icon" data-tooltip-key="detail_data_tip" data-tooltip="Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.">?</span>
+                      </span>
+                      <span class="setting-desc" data-localize="detail_data_desc">Keep the standard map or add recent Overture roads and places.</span>
+                    </span>
+                  </label>
+                  <div class="settings-control">
+                    <div class="segmented-control" id="meld-detail-data-group"><button type="button" class="segment active" data-default data-v="standard" data-localize="detail_data_standard">Standard</button><button type="button" class="segment" data-v="overture" data-localize="detail_data_overture">Overture Monthly Detail</button></div>
+                  </div>
+                </div>
+                <div class="settings-row setting-tile is-wide meld-only">
+                  <label for="meld-china-province-select" class="setting-label">
+                    <svg class="icon setting-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+                    <span class="setting-text">
+                      <span class="setting-heading">
+                        <span data-localize="meld_china_province">China Province</span><span class="tooltip-icon" data-tooltip-key="meld_china_province_tip" data-tooltip="Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices.">?</span>
+                      </span>
+                      <span class="setting-desc" data-localize="meld_china_province_desc">Use the province-level OpenStreetMap source for China.</span>
+                    </span>
+                  </label>
+                  <div class="settings-control">
+                    <select id="meld-china-province-select" name="meld-china-province-select" class="settings-select">
+                      <option value="" selected data-localize="placeholder_meld_china_province">Choose a province</option>
+                      <option value="anhui">安徽 Anhui</option>
+                      <option value="beijing">北京 Beijing</option>
+                      <option value="chongqing">重庆 Chongqing</option>
+                      <option value="fujian">福建 Fujian</option>
+                      <option value="gansu">甘肃 Gansu</option>
+                      <option value="guangdong">广东 Guangdong</option>
+                      <option value="guangxi">广西 Guangxi</option>
+                      <option value="guizhou">贵州 Guizhou</option>
+                      <option value="hainan">海南 Hainan</option>
+                      <option value="hebei">河北 Hebei</option>
+                      <option value="heilongjiang">黑龙江 Heilongjiang</option>
+                      <option value="henan">河南 Henan</option>
+                      <option value="hong-kong">香港 Hong Kong</option>
+                      <option value="hubei">湖北 Hubei</option>
+                      <option value="hunan">湖南 Hunan</option>
+                      <option value="inner-mongolia">内蒙古 Inner Mongolia</option>
+                      <option value="jiangsu">江苏 Jiangsu</option>
+                      <option value="jiangxi">江西 Jiangxi</option>
+                      <option value="jilin">吉林 Jilin</option>
+                      <option value="liaoning">辽宁 Liaoning</option>
+                      <option value="macau">澳门 Macau</option>
+                      <option value="ningxia">宁夏 Ningxia</option>
+                      <option value="qinghai">青海 Qinghai</option>
+                      <option value="shaanxi">陕西 Shaanxi</option>
+                      <option value="shandong">山东 Shandong</option>
+                      <option value="shanghai">上海 Shanghai</option>
+                      <option value="shanxi">山西 Shanxi</option>
+                      <option value="sichuan">四川 Sichuan</option>
+                      <option value="tianjin">天津 Tianjin</option>
+                      <option value="tibet">西藏 Tibet</option>
+                      <option value="xinjiang">新疆 Xinjiang</option>
+                      <option value="yunnan">云南 Yunnan</option>
+                      <option value="zhejiang">浙江 Zhejiang</option>
+                    </select>
                   </div>
                 </div>
                 <div class="settings-row setting-tile is-wide meld-only">

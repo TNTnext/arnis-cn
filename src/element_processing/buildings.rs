@@ -93,6 +93,11 @@ pub(crate) enum RoofType {
     Flat,   // Default flat roof
 }
 
+/// Below this footprint a generic observatory tag is more likely to describe
+/// a small instrument shelter than a building whose dome should replace its
+/// roof.
+const SPECIAL_DOME_MIN_AREA_M2: f64 = 24.0;
+
 /// Enum representing different wall depth styles for building facades.
 /// Each style creates visual depth by placing blocks outward from the wall
 /// plane, making windows appear recessed.
@@ -2869,17 +2874,30 @@ impl BuildingStyle {
 
         // === Roof ===
 
-        // Priority: roof:shape tag, the shape the laser saw, preset default,
-        // auto-gable, then flat. A part or a building closed in by others keeps
-        // the generator's lid whatever the laser saw.
+        // Priority: roof:shape tag, the shape the laser saw, a recognizable
+        // observatory/planetarium, preset default, auto-gable, then flat. A
+        // part or a building closed in by others keeps the generator's lid
+        // whatever the laser saw.
         let measured_roof = element
             .tags
             .get(crate::survey::roofs::SHAPE_HINT)
             .filter(|_| !roof_ctx.enclosed && !element.tags.contains_key("building:part"))
             .map(|s| parse_roof_type(s));
+        // A mapped outline can describe a dome but leave roof:shape empty.
+        // Treat only substantial, free-standing footprints as special so a
+        // gatehouse or a named point does not become a giant dome.
+        let special_roof = if roof_ctx.enclosed
+            || (footprint_size as f64) < SPECIAL_DOME_MIN_AREA_M2 * roof_ctx.scale * roof_ctx.scale
+        {
+            None
+        } else {
+            special_building_roof(&element.tags)
+        };
         let (roof_type, generate_roof) = if let Some(roof_shape) = element.tags.get("roof:shape") {
             (parse_roof_type(roof_shape), true)
         } else if let Some(rt) = measured_roof {
+            (rt, true)
+        } else if let Some(rt) = special_roof {
             (rt, true)
         } else if let Some(rt) = preset.roof_type {
             let should_generate = preset.generate_roof.unwrap_or(rt != RoofType::Flat);
@@ -14321,6 +14339,74 @@ fn read_roof_shape(tags: &HashMap<String, String>) -> Option<&String> {
         .or_else(|| tags.get(crate::survey::roofs::SHAPE_HINT))
 }
 
+/// Recognizes buildings whose conventional square lid would lose their
+/// identity: observatories, planetariums and museums described as spheres or
+/// domes. This deliberately ignores anything with an explicit roof shape,
+/// measured roof hint or `building:part`, which remain authoritative.
+fn special_building_roof(tags: &HashMap<String, String>) -> Option<RoofType> {
+    if tags.contains_key("roof:shape")
+        || tags.contains_key(crate::survey::roofs::SHAPE_HINT)
+        || tags.contains_key("building:part")
+    {
+        return None;
+    }
+
+    let lower = |key: &str| tags.get(key).map(|value| value.trim().to_ascii_lowercase());
+    let is_one_of = |key: &str, values: &[&str]| {
+        lower(key).is_some_and(|value| values.contains(&value.as_str()))
+    };
+
+    if is_one_of(
+        "building",
+        &["observatory", "planetarium", "sphere", "dome"],
+    ) || is_one_of(
+        "building:shape",
+        &["sphere", "spherical", "dome", "hemisphere"],
+    ) || is_one_of("building:use", &["observatory", "planetarium"])
+        || is_one_of("man_made", &["observatory", "telescope"])
+        || is_one_of("tourism", &["planetarium"])
+        || is_one_of("amenity", &["planetarium"])
+        || is_one_of("attraction", &["planetarium"])
+        || is_one_of("museum", &["astronomy", "observatory", "planetarium"])
+    {
+        return Some(RoofType::Dome);
+    }
+
+    let named_as_dome = tags.iter().any(|(key, value)| {
+        let names_the_place = key == "name"
+            || key.starts_with("name:")
+            || matches!(
+                key.as_str(),
+                "official_name" | "short_name" | "alt_name" | "loc_name"
+            );
+        if !names_the_place {
+            return false;
+        }
+        let name = value.to_ascii_lowercase();
+        [
+            "天文台",
+            "天文馆",
+            "天象馆",
+            "太空馆",
+            "星空馆",
+            "球幕",
+            "球形博物馆",
+            "球体博物馆",
+            "圆顶博物馆",
+            "穹顶博物馆",
+            "observatory",
+            "planetarium",
+            "sphere museum",
+            "spherical museum",
+            "dome museum",
+        ]
+        .iter()
+        .any(|marker| name.contains(marker))
+    });
+
+    named_as_dome.then_some(RoofType::Dome)
+}
+
 /// Calculates roof peak height for chimney placement
 /// Parses roof:shape tag into RoofType enum.
 ///
@@ -20901,6 +20987,14 @@ fn generate_roof(
     // A mapped roof:height, else a roof:angle pitch, overrides the heuristic caps.
     let peak_cap = roof_peak_cap(&element.tags, roof_type, &config, &ridge, scale_factor);
     config.peak_cap = peak_cap.or(rise_hint);
+    // Recognizable observatories and sphere-shaped museums get a true
+    // hemispherical profile rather than the deliberately squat generic dome.
+    if roof_type == RoofType::Dome
+        && config.peak_cap.is_none()
+        && special_building_roof(&element.tags).is_some()
+    {
+        config.peak_cap = Some((config.width().min(config.length()) / 2).max(2));
+    }
     config.max_rise = Some(max_inferred_rise(steep_gable, scale_factor));
     // An L, T, U or courtyard footprint gets a ridge per wing. A mapped or
     // preferred ridge direction applies to the main wing.
@@ -24976,6 +25070,64 @@ mod style_tests {
         assert_eq!(parse_roof_type("hipped"), RoofType::Hipped);
         assert_eq!(parse_roof_type("round"), RoofType::Round);
         assert_eq!(parse_roof_type("gabled"), RoofType::Gabled);
+    }
+
+    #[test]
+    fn observatories_and_spherical_museums_get_dome_roofs() {
+        use crate::element_processing::building_test_support::tag_map;
+
+        assert_eq!(
+            special_building_roof(&tag_map(&[("building", "observatory")])),
+            Some(RoofType::Dome)
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[("man_made", "observatory")])),
+            Some(RoofType::Dome)
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[
+                ("building", "museum"),
+                ("name:zh", "紫金山天文台"),
+            ])),
+            Some(RoofType::Dome)
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[
+                ("building", "museum"),
+                ("name", "Spherical Museum of Astronomy"),
+            ])),
+            Some(RoofType::Dome)
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[("building", "yes")])),
+            None
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[
+                ("building", "museum"),
+                ("roof:shape", "flat"),
+                ("name", "天文馆"),
+            ])),
+            None,
+            "an explicit flat roof stays authoritative"
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[
+                ("building:part", "yes"),
+                ("name", "天文台穹顶"),
+            ])),
+            None,
+            "mapped 3D parts keep their own shape"
+        );
+        assert_eq!(
+            special_building_roof(&tag_map(&[
+                ("building", "yes"),
+                (crate::survey::roofs::SHAPE_HINT, "flat"),
+                ("name", "城市天文馆"),
+            ])),
+            None,
+            "a measured roof stays authoritative"
+        );
     }
 
     #[test]

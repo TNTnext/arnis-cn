@@ -19,6 +19,43 @@ Download the [latest release](https://github.com/louis-e/arnis/releases/) or [co
 Choose your area on the map using the rectangle tool, then simply click on <i>Start Generation</i>!
 Additionally, you can customize various generation settings, such as world scale, spawn point, or building interior generation.
 
+### China OpenStreetMap sources
+
+In **Settings → OSM Data Source**, choose **China Nationwide** for the complete OpenStreetMap France China extract, or **China Province** to download one province-level extract. The nationwide file is about 1.7 GB, is cached after its first download, and is cut locally to the selected area. The data comes from OpenStreetMap and is available under the ODbL.
+
+The same sources are available on the command line:
+
+```bash
+arnis --china-national --output-dir="C:/YOUR_PATH/.minecraft/saves" --bbox="min_lat,min_lng,max_lat,max_lng"
+arnis --china-province=beijing --output-dir="C:/YOUR_PATH/.minecraft/saves" --bbox="min_lat,min_lng,max_lat,max_lng"
+```
+
+Existing global terrain, land-cover and building sources continue to supplement the selected OSM extract.
+
+### Detailed China road and place data
+
+For counties and smaller cities such as Taicang, the most useful setup is a layered one: use **China Nationwide** or **China Province** for the OpenStreetMap base map, then enable **Detailed Map Data → Overture Monthly Detail**. This adds:
+
+- Overture `transportation`: recent roads and railways, merged only where they are not already present in the OSM base.
+- Overture `places`: newer named shops, restaurants, schools, hospitals, stations and other points of interest. A place inside an OSM building labels that building; other places become standalone named nodes.
+- The existing Overture building footprints, ESA WorldCover land cover and Copernicus elevation sources.
+
+The detailed layer is intentionally separate from the building-footprint toggle. It is off by default so existing standard downloads do not grow unexpectedly. Both choices are independent: **OSM Data Source** selects the base map, while **Detailed Map Data** selects whether the monthly Overture road/place layer is added.
+
+The Overture archives are planet-scale and the transportation archive is over 100 GB. Arnis never downloads either archive whole: it reads the PMTiles header, directory pages and only the z14 tiles that intersect the selected area. These pieces are cached per monthly release, so `--prewarm` can prepare a county for a later `--offline` run.
+
+```bash
+arnis --china-province=jiangsu --overture-detail --output-dir="C:/YOUR_PATH/.minecraft/saves" --bbox="31.34,121.00,31.56,121.27"
+```
+
+No single public dataset makes every lane and business in every Chinese county complete and current. The combination is deliberately additive: OSM remains authoritative for mapped roads, buildings and local geometry, while Overture fills gaps and contributes a newer monthly snapshot. A small county can still have sparse coverage in one layer; the Download Plan reports what the selected area will read and cache.
+
+Attribution and licenses: OpenStreetMap data is under the [ODbL](https://www.openstreetmap.org/copyright). Overture [transportation](https://docs.overturemaps.org/schema/reference/transportation/segment/) is under the ODbL. Overture [places](https://docs.overturemaps.org/schema/reference/places/place/) combines sources under permissive licenses including CDLA-Permissive-2.0, Apache-2.0 and CC0. See [Overture attribution](https://docs.overturemaps.org/attribution/) for the complete source list.
+
+### Special building shapes
+
+Observatories, planetariums and buildings named as spherical or domed museums receive a hemispherical roof when their data has no more precise shape. Recognition uses OSM tags such as `building=observatory`, `man_made=observatory`, `tourism=planetarium`, localized names containing terms such as `天文台`, `天文馆`, `球幕` or `observatory`, and matching Overture place categories. The special shape applies only to free-standing footprints of at least 24 m². An explicit `roof:shape`, a measured roof shape or mapped `building:part` geometry always takes precedence.
+
 ## 📚 Documentation
 
 <img src="assets/git/documentation.png" width="100%" alt="Banner">

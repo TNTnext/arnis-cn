@@ -232,6 +232,9 @@ export function meldFlags({ oneWorld, java, caves, extendHeight, lods, plan = fa
 
   // Data
   const source = choice('meld-osm-source-group');
+  if (source === 'china-national') f.push('--china-national');
+  if (source === 'china') add('--china-province', value('meld-china-province-select'));
+  if (choice('meld-detail-data-group') === 'overture') f.push('--overture-detail=true');
   if (source === 'archive') add('--osm-tiles-url', value('meld-archive-folder-input') || defaultArchive);
   if (source === 'region') {
     f.push('--osm-pbf=geofabrik');
@@ -251,6 +254,13 @@ export function meldFlags({ oneWorld, java, caves, extendHeight, lods, plan = fa
   if (!plan) skipCells = null;
   return f;
 }
+
+// A China source with no province is not a request to use the default source: refuse it before
+// starting so the backend never silently builds from somewhere the user did not choose.
+export const chinaProvinceMissing = () =>
+  on('advanced-meld-features-toggle') &&
+  choice('meld-osm-source-group') === 'china' &&
+  !value('meld-china-province-select');
 
 // What a job's cells belong to: the selection, the One World, whether a run builds in cells at all
 // (Advanced on, Parallel cells not Off) and the flags that cut it (--only-pieces and --skip-cells
@@ -278,6 +288,7 @@ const FLAG_CONTROLS = [
   ['--tree-realm', 'meld-tree-realm-select', 'value', 'auto'], ['--cave-style', 'meld-cave-style-select', 'value', 'all-mix'],
   ['--cave-ores', 'meld-cave-ores-group', 'group', 'normal'], ['--river-bed', 'meld-river-bed-group', 'group', 'off'],
   ['--water-detail', 'meld-water-detail-group', 'group', 'default'], ['--climate-mode', 'meld-climate-mode-group', 'group', 'origin'],
+  ['--overture-detail', 'meld-detail-data-group', 'flag-group', 'standard'],
   ['--osm-pbf-url', 'meld-pbf-url-input', 'value', ''], ['--overpass-url', 'meld-overpass-input', 'value', ''],
   ['--offline', 'meld-offline-toggle', 'toggle'], ['--origin', 'meld-origin-input', 'value', ''],
   ['--world-border', 'meld-world-border-toggle', 'toggle'], ['--region-format', 'meld-region-format-group', 'group', 'mca'],
@@ -305,13 +316,13 @@ export function applyFlags(flags, rebuild = false) {
   // the control offers it, and it never becomes part of a selector.
   const set = (id, kind, v) => {
     if (kind === 'group') {
-      const seg = Array.from(document.querySelectorAll(`#${id} .segment`)).find((s) => s.dataset.v === v);
-      if (seg && choice(id) !== v) {
+      const segment = Array.from(document.querySelectorAll(`#${id} .segment`)).find((s) => s.dataset.v === v);
+      if (segment && choice(id) !== v) {
         // A greyed group's buttons ignore click(): lifted for the one call, as settings-store.js does.
-        const greyed = seg.disabled;
-        seg.disabled = false;
-        seg.click();
-        seg.disabled = greyed;
+        const greyed = segment.disabled;
+        segment.disabled = false;
+        segment.click();
+        segment.disabled = greyed;
       }
       return;
     }
@@ -328,7 +339,8 @@ export function applyFlags(flags, rebuild = false) {
     // Where the data comes from stays the user's own choice: a job never brings its servers along.
     if (SOURCE_FLAGS.has(flag)) continue;
     const v = kept.get(flag);
-    if (kind === 'value' || kind === 'group') set(id, kind, v === undefined ? fallback : String(v));
+    if (kind === 'flag-group') set(id, 'group', v === undefined ? fallback : 'overture');
+    else if (kind === 'value' || kind === 'group') set(id, kind, v === undefined ? fallback : String(v));
     else if (kind === 'on') set(id, 'toggle', v !== 'false');
     else set(id, 'toggle', kind === 'untoggle' ? v === undefined : v !== undefined);
   }
@@ -1195,7 +1207,7 @@ function lines(box, rows) {
   box.hidden = false;
 }
 
-const SOURCE_NAMES = { osm: 'Map data', elevation: 'Elevation', land_cover: 'Land cover', overture: 'Building footprints', laser: 'Laser scans' };
+const SOURCE_NAMES = { osm: 'Map data', elevation: 'Elevation', land_cover: 'Land cover', overture: 'Building footprints', overture_detail: 'Roads and places', laser: 'Laser scans' };
 
 // `area()` is the selected bbox; `plan()` the settings a run's plan depends on; `baking(on)` hears
 // a Download & Bake start and end.
@@ -1275,6 +1287,14 @@ export function initDataPanel({ invoke, area, plan, prefetch, baking = () => {} 
   };
   el('meld-plan-show').addEventListener('click', () => check());
   el('meld-plan-open').addEventListener('click', () => cacheRoot && invoke('gui_show_in_folder', { path: cacheRoot }).catch(() => {}));
+  // Switching the source changes what the plan is for. If the result is already open, refresh it
+  // once the segmented control has moved its active segment and the settings store has saved it.
+  const refreshShownPlan = () => {
+    if (!out.hidden) setTimeout(() => check(), 0);
+  };
+  el('meld-osm-source-group')?.addEventListener('click', refreshShownPlan);
+  el('meld-detail-data-group')?.addEventListener('click', refreshShownPlan);
+  el('meld-china-province-select')?.addEventListener('change', refreshShownPlan);
 
   // Download now: a run with --prewarm fills the caches and writes no world. The run's own
   // progress lines come through the window's progress-update event.

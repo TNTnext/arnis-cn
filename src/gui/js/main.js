@@ -14,7 +14,7 @@ import { initSettingsLayout, syncSettingsLayout } from './settings-layout.js';
 import { initNewBadges } from './new-badges.js';
 import {
   t as oneWorldText,
-  initMeldFeatures, refreshLayout, meldFlags, cellsKey, generationTarget, generationShapes, progressText, holdsNotice,
+  initMeldFeatures, refreshLayout, meldFlags, chinaProvinceMissing, cellsKey, generationTarget, generationShapes, progressText, holdsNotice,
   initRunControls, initCellMenu, notePiece, clearPieces, dropStalePieces, resetPieces, showRunControls,
   initJobPlan, schedulePlan, planPieces, planPending, isPiecesJob, selectWithRing,
   setPlanMask, hasPlanMask, refreshStretch,
@@ -699,7 +699,7 @@ const EARTH_ONLY_SETTINGS = [
   'tile-theme-select',
   'custom-tile-url'
 ];
-const EARTH_ONLY_SEGMENTED = ['max-tree-size-group', 'field-preset-group', 'signage-group'];
+const EARTH_ONLY_SEGMENTED = ['max-tree-size-group', 'field-preset-group', 'signage-group', 'meld-detail-data-group'];
 
 // A tile URL template Leaflet can actually fill in. Deliberately permissive
 // about the host - the entire point is to reach something we do not know about -
@@ -3845,6 +3845,7 @@ const ROW_REASONS = {
   reason_bushes: ['Turn on Bushes.', 'meld-bushes-toggle'],
   reason_caves: ['Turn on Caves.', 'caves-toggle'],
   reason_tree_folder: ['Enter a Custom Tree Folder.', 'meld-tree-pack-dir-input'],
+  reason_china: ['Pick China Province as the OSM Data Source.', 'meld-osm-source-group'],
   reason_archive: ['Pick Local Archive as the OSM Data Source.', 'meld-osm-source-group'],
   reason_region_download: ['Pick Region Download as the OSM Data Source.', 'meld-osm-source-group'],
   reason_blueprint: ['Pick a Generation Mode other than Blueprint.', 'generation-mode-select'],
@@ -4016,6 +4017,7 @@ function refreshAdvancedRows() {
   group('meld-tree-pack-mode-group', !!val('meld-tree-pack-dir-input').trim(), 'reason_tree_folder');
   row('meld-cave-style-select', on('caves-toggle'), 'reason_caves');
   group('meld-cave-ores-group', on('caves-toggle'), 'reason_caves');
+  row('meld-china-province-select', seg('meld-osm-source-group') === 'china', 'reason_china');
   row('meld-archive-folder-input', seg('meld-osm-source-group') === 'archive', 'reason_archive');
   row('meld-pbf-url-input', seg('meld-osm-source-group') === 'region', 'reason_region_download');
   for (const id of ['meld-seed-input', 'meld-surface-patches-toggle', 'meld-buildings-toggle', 'meld-tree-realm-select',
@@ -5048,6 +5050,15 @@ async function startGeneration(confirmed = false, prewarm = false) {
     return;
   }
   if (generationButtonEnabled === false) {
+    return;
+  }
+  // A China source without a province is incomplete, not a request to fall back to the default.
+  if (chinaProvinceMissing()) {
+    const info = document.getElementById('progress-info');
+    if (info) {
+      info.textContent = oneWorldText('meld_china_province_required', 'Choose a China province first.');
+      info.style.color = '#fa7878';
+    }
     return;
   }
   // The backend refuses a run during a bake only after a new world was made for it.

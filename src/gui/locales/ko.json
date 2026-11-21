@@ -408,6 +408,12 @@
   "meld_blinear_level_desc": "B_Linear 리전의 압축 레벨입니다.",
   "meld_osm_source": "OSM 데이터 소스",
   "meld_osm_source_desc": "지도 데이터의 출처입니다.",
+  "detail_data": "Detailed Map Data",
+  "detail_data_desc": "Keep the standard map or add recent Overture roads and places.",
+  "detail_data_standard": "Standard",
+  "detail_data_overture": "Overture Monthly Detail",
+  "detail_data_tip": "Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.",
+  "data_source_overture_detail": "Roads and places",
   "meld_archive_folder": "아카이브 폴더",
   "meld_archive_folder_desc": "로컬 타일 아카이브의 폴더입니다. 실험적.",
   "meld_pbf_url": "추출 URL",
@@ -876,5 +882,13 @@
   "lidar_limit": "다운로드 한도",
   "lidar_limit_desc": "한 번 생성할 때 받는 레이저 데이터 최대량.",
   "lidar_limit_tip": "한 번 생성할 때 받는 레이저 데이터의 최대량입니다. 캐시된 스캔은 세지 않습니다. 넘으면 레이저 없이 계속합니다. 1 km²에 약 100–300 MB입니다.",
-  "lidar_over_limit": "레이저 데이터를 건너뛰었습니다: 이 영역에는 약 {mb} MB가 필요하며 다운로드 한도({limit} MB)를 넘습니다. 사용자 지정 설정 > 고급 > 레이저 데이터에서 늘릴 수 있습니다."
+  "lidar_over_limit": "레이저 데이터를 건너뛰었습니다: 이 영역에는 약 {mb} MB가 필요하며 다운로드 한도({limit} MB)를 넘습니다. 사용자 지정 설정 > 고급 > 레이저 데이터에서 늘릴 수 있습니다.",
+    "meld_osm_source_china_national": "China Nationwide",
+    "meld_osm_source_china": "China Province",
+  "meld_china_province": "China Province",
+  "meld_china_province_desc": "Use the province-level OpenStreetMap source for China.",
+  "placeholder_meld_china_province": "Choose a province",
+  "reason_china": "Pick China Province as the OSM Data Source.",
+  "meld_china_province_required": "Choose a China province first.",
+  "meld_china_province_tip": "Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices."
 }

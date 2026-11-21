@@ -840,7 +840,7 @@ button.setting-reason:focus-visible {
   background: var(--ui-field);
 }
 
-/* Three long names: they wrap in the languages where they do not fit. */
+/* Several long source names: they wrap in the languages where they do not fit. */
 .settings-page #meld-osm-source-group {
   flex-wrap: wrap;
 }

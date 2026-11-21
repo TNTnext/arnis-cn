@@ -1,8 +1,8 @@
 //! Minimal Mapbox Vector Tile decoder.
 //!
-//! Only what Overture's building tiles need: layers, their key/value tables,
-//! and polygon rings. Points and linestrings are decoded to rings too, but the
-//! caller filters on `geom_type`.
+//! The layers, their key/value tables, and every geometry Overture publishes.
+//! Points and lines are stored as one-entry and many-entry `rings`, so the
+//! caller can filter on `geom_type` without a second decoder.
 //!
 //! This parses bytes straight off the network, so every read is bounds-checked
 //! and every count that comes out of the input is bounded by the input that is
@@ -15,7 +15,9 @@ const WIRE_64BIT: u8 = 1;
 const WIRE_LEN: u8 = 2;
 const WIRE_32BIT: u8 = 5;
 
-/// MVT geometry type for a polygon (`vector_tile.proto`, `GeomType.POLYGON`).
+/// MVT geometry types (`vector_tile.proto`, `GeomType`).
+pub const GEOM_POINT: u32 = 1;
+pub const GEOM_LINESTRING: u32 = 2;
 pub const GEOM_POLYGON: u32 = 3;
 
 /// Default tile extent when a layer omits it, per the MVT specification.
@@ -372,12 +374,16 @@ fn decode_feature(reader: &mut Reader<'_>) -> Result<Feature> {
     })
 }
 
-/// Decode MVT command/parameter integers into rings.
+/// Decode MVT command/parameter integers into point parts.
 ///
 /// Commands are `(id & 0x7) | (count << 3)`; `MoveTo` (1) and `LineTo` (2) each
 /// take two zigzag parameters per repetition, `ClosePath` (7) takes none.
 /// Coordinates are cursor deltas, so a truncated stream simply ends the ring
 /// rather than corrupting the ones already read.
+///
+/// The historical `Ring` name predates line and point support. A point is one
+/// one-entry part, a LineString/MultiLineString is one or more many-entry parts,
+/// and only polygon callers require three entries.
 fn decode_geometry(geometry: &[u32]) -> Vec<Ring> {
     let mut rings: Vec<Ring> = Vec::new();
     let mut current: Vec<(i32, i32)> = Vec::new();
@@ -385,9 +391,10 @@ fn decode_geometry(geometry: &[u32]) -> Vec<Ring> {
     let mut i = 0usize;
 
     let flush = |points: &mut Vec<(i32, i32)>, rings: &mut Vec<Ring>| {
-        // Two points cannot bound an area; a degenerate ring is dropped rather
-        // than passed on as a zero-area polygon.
-        if points.len() >= 3 {
+        // Points and two-vertex lines are valid MVT features. Area consumers
+        // filter short parts themselves; dropping them here lost every place
+        // and every straight road segment before it reached the caller.
+        if !points.is_empty() {
             let ring = std::mem::take(points);
             let area2 = shoelace2(&ring);
             rings.push(Ring {
@@ -703,10 +710,17 @@ mod tests {
     }
 
     #[test]
-    fn degenerate_rings_are_dropped() {
-        // Two points cannot bound an area.
+    fn short_parts_are_kept_for_lines_and_points() {
+        // Two points cannot bound an area, but they are a complete straight
+        // LineString. The polygon caller filters them out instead.
         let rings = decode_geometry(&[(1 << 3) | 1, zz(0), zz(0), (1 << 3) | 2, zz(5), zz(5)]);
-        assert!(rings.is_empty());
+        assert_eq!(rings.len(), 1);
+        assert_eq!(rings[0].points, vec![(0, 0), (5, 5)]);
+
+        // One MoveTo is a Point.
+        let point = decode_geometry(&[(1 << 3) | 1, zz(7), zz(9)]);
+        assert_eq!(point.len(), 1);
+        assert_eq!(point[0].points, vec![(7, 9)]);
     }
 
     #[test]

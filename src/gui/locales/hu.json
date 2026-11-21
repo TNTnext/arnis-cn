@@ -408,6 +408,12 @@
   "meld_blinear_level_desc": "A B_Linear régiók tömörítési szintje.",
   "meld_osm_source": "OSM adatforrás",
   "meld_osm_source_desc": "Honnan származnak a térképadatok.",
+  "detail_data": "Detailed Map Data",
+  "detail_data_desc": "Keep the standard map or add recent Overture roads and places.",
+  "detail_data_standard": "Standard",
+  "detail_data_overture": "Overture Monthly Detail",
+  "detail_data_tip": "Standard keeps OpenStreetMap as the base map. Overture monthly detail adds recent road, railway and named-place data on top. It reads only the map tiles touching the selected area, so large archives are never downloaded whole. Detailed Overture places can be especially useful in Chinese counties and smaller cities.",
+  "data_source_overture_detail": "Roads and places",
   "meld_archive_folder": "Archívum mappa",
   "meld_archive_folder_desc": "A helyi csempearchívum mappája. Kísérleti.",
   "meld_pbf_url": "Kivonat URL",
@@ -876,5 +882,13 @@
   "lidar_limit": "Letöltési korlát",
   "lidar_limit_desc": "Legfeljebb ennyi lézeradatot tölt le egy futás.",
   "lidar_limit_tip": "Legfeljebb ennyi lézeradatot tölt le egy futás. A gyorsítótárazott szkenek nem számítanak. Felette nélkülük fut tovább. Egy négyzetkilométer kb. 100–300 MB.",
-  "lidar_over_limit": "A lézeradatok kimaradtak: a terület kb. {mb} MB-ot igényel, többet, mint a Letöltési korlát ({limit} MB). Növeld itt: Testreszabási lehetőségek > Haladó > Lézeradatok."
+  "lidar_over_limit": "A lézeradatok kimaradtak: a terület kb. {mb} MB-ot igényel, többet, mint a Letöltési korlát ({limit} MB). Növeld itt: Testreszabási lehetőségek > Haladó > Lézeradatok.",
+    "meld_osm_source_china_national": "China Nationwide",
+    "meld_osm_source_china": "China Province",
+  "meld_china_province": "China Province",
+  "meld_china_province_desc": "Use the province-level OpenStreetMap source for China.",
+  "placeholder_meld_china_province": "Choose a province",
+  "reason_china": "Pick China Province as the OSM Data Source.",
+  "meld_china_province_required": "Choose a China province first.",
+  "meld_china_province_tip": "Downloads the selected province-level OpenStreetMap extract from OpenStreetMap France. It is cached once, then cut locally for this area. Hong Kong and Macau are separate choices."
 }
