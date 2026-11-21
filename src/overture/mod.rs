@@ -3445,6 +3445,34 @@ mod tests {
 mod budget_tests {
     use super::*;
 
+    #[test]
+    #[ignore = "network integration test: reads Taicang Overture building PMTiles ranges"]
+    fn fetches_taicang_buildings_from_the_latest_overture_tiles() {
+        let bbox = LLBBox::from_str("31.42,121.08,31.48,121.18").unwrap();
+        let client = overture_client().expect("Overture HTTP client");
+        let data = collect_overture_buildings(
+            &client,
+            &bbox,
+            OvertureSource::Tiles,
+            false,
+            MIN_OVERTURE_BUILDINGS,
+            true,
+            true,
+        )
+        .expect("Taicang Overture building fetch");
+        println!(
+            "TAICANG_OVERTURE_BUILDINGS count={} hints={} released={:?}",
+            data.buildings.len(),
+            data.hints.len(),
+            cache::last_good_release()
+        );
+        assert!(
+            data.buildings.len() >= 1_000,
+            "expected broad building coverage in Taicang, got {}",
+            data.buildings.len()
+        );
+    }
+
     // A small city keeps the old flat allowance.
     #[test]
     fn a_small_area_gets_the_floor() {

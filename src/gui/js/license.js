@@ -43,8 +43,8 @@ export const licenseText = `
 <h3>Elevation, Land Cover and Buildings</h3>
 <div class="credits-list">
 <div class="credit">
-<h4>Overture Maps Buildings</h4>
-<p>The "Additional Buildings" setting adds building footprints from the <a href="https://overturemaps.org/" target="_blank" rel="noopener noreferrer">Overture Maps Foundation</a> buildings theme, and fills in building heights that OpenStreetMap leaves untagged. Contains information from Overture Maps, which is made available under the <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener noreferrer">Open Database License (ODbL)</a>. &copy; OpenStreetMap contributors; contributing sources include Esri Community Maps, Google Open Buildings, Microsoft Global ML Building Footprints and USGS 3DEP. Full attribution: <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener noreferrer">docs.overturemaps.org/attribution</a>.</p>
+  <h4>Overture Maps Buildings</h4>
+  <p>The "Additional Buildings" and "Overture Complete" settings add building footprints from the <a href="https://overturemaps.org/" target="_blank" rel="noopener noreferrer">Overture Maps Foundation</a> buildings theme, and fill in building heights that OpenStreetMap leaves untagged. Contains information from Overture Maps, which is made available under the <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener noreferrer">Open Database License (ODbL)</a>. &copy; OpenStreetMap contributors; contributing sources include Esri Community Maps, Google Open Buildings, Microsoft Global ML Building Footprints, the East Asian building dataset and USGS 3DEP. Full attribution: <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener noreferrer">docs.overturemaps.org/attribution</a>.</p>
 </div>
 <div class="credit">
 <h4>Mapterhorn Terrain Tiles</h4>

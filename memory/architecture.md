@@ -22,7 +22,7 @@
 3. 检查磁盘与区域规模
 4. 并行获取 OSM、Overture、地形/土地覆盖和可选的街景与模型数据
 5. 解析 OSM，投影到 XZ 方块坐标
-6. 合并 Overture/Overture 建筑来源，按优先级排序
+6. 合并 OSM 与 Overture 建筑来源，再补充 Overture 道路、铁路和地点，按优先级排序
 7. 应用旋转、轮廓裁剪和地表覆盖修正
 8. `data_processing::generate_world_with_options`
 9. 写出世界、设置出生点、构建附加数据包和 LOD
@@ -45,7 +45,7 @@
 - `climate.rs`、`climate_field.rs`、`ecoregion.rs`：气候和生态区
 - `canopy/`：树冠高度
 - `survey/`：LiDAR、航拍和测得细节
-- `overture/`：额外建筑轮廓
+- `overture/`：Overture 建筑轮廓、月度道路/铁路和具名地点；完整模式按选区读取 PMTiles 瓦片
 - `mapillary/`：街景获取、匹配、立面重建
 - `models_3d/`：外部 3D 模型和体素化
 

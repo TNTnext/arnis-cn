@@ -1,5 +1,5 @@
 // Run: node tests/gui/detail-source.mjs
-// The standard map and the monthly Overture road/place layer are separate choices. The detailed
+// The standard map and the complete monthly Overture layer are separate choices. The detailed
 // layer is off by default, survives the job-flag round trip, and appears in the Download Plan.
 import assert from 'node:assert';
 import fs from 'node:fs';
@@ -69,9 +69,9 @@ assert.strictEqual(activeDetail, 'standard', 'a job without the flag restores th
 const store = fs.readFileSync(new URL('../../src/gui/js/settings-store.js', import.meta.url), 'utf8');
 assert.ok(store.includes("{ id: 'meld-detail-data-group', kind: 'segmented', store: OWN, valueAttr: 'data-v' }"));
 const layout = fs.readFileSync(new URL('../../src/gui/js/settings-layout.js', import.meta.url), 'utf8');
-assert.ok(layout.includes("'meld-detail-data-group': 'detailed detail overture"));
+assert.ok(layout.includes("'meld-detail-data-group': 'detailed complete detail overture"));
 const plan = fs.readFileSync(new URL('../../src/gui/js/meld-features.js', import.meta.url), 'utf8');
-assert.ok(plan.includes("overture_detail: 'Roads and places'"));
+assert.ok(plan.includes("overture_detail: 'Buildings, roads and places'"));
 
 for (const file of fs.readdirSync(new URL('../../src/gui/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
   const locale = JSON.parse(fs.readFileSync(new URL(`../../src/gui/locales/${file}`, import.meta.url), 'utf8'));

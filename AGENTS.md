@@ -116,7 +116,7 @@ GUI 测试脚本是独立的 `.mjs` 文件，没有 npm 构建步骤；每个文
 2. `src/main.rs::run_cli` 规划输出目录和世界格式，并行获取 OSM、Overture、高程、土地覆盖等输入。
    - `--china-national` 从 OpenStreetMap France 下载中国全国 PBF，缓存后在本地裁切所选区域。
    - `--china-province` 从 OpenStreetMap France 下载中国省级 PBF，缓存后在本地裁切。
-   - `--overture-detail` 在 OSM 基础上并行读取 Overture 月度 `transportation` 和 `places` PMTiles；只取与选区相交的 z14 瓦片，不下载整档。
+   - `--overture-detail` 是“Overture 完整数据”模式，会同时启用 `buildings`、`transportation` 和 `places`；只取与选区相交的 z14 瓦片，不下载整档。
 3. `src/osm_parser.rs` 过滤标签、投影坐标、裁剪几何，并形成 `ProcessedElement`。
 4. `src/ground.rs` 和 `src/ground_generation.rs` 建立地形、水体、地表和高度信息。
 5. `src/building_sources.rs` 合并激光和 Overture 建筑，随后 `src/overture/detail.rs` 补充道路、铁路与具名地点，再执行 OSM 优先级排序。建筑内的地点标签写到建筑，其余成为独立地点节点。
@@ -134,8 +134,8 @@ GUI 测试脚本是独立的 `.mjs` 文件，没有 npm 构建步骤；每个文
 - `--offline` 只使用缓存；缺少输入时应明确失败，不能静默生成有洞的世界。
 - GUI 选择中国全国数据时只发送 `--china-national`；选择省级数据时必须先选择省份。
 - 中国全国、省级和旧 OSM 来源互斥；切回其他来源时不能残留 `--china-national` 或 `--china-province`。
-- `--overture-detail` 与 `--overture` 建筑补充是两个独立开关；详细地点可补充建筑名称，但不覆盖已有 OSM 标签。
-- Overture 详细层只能按 PMTiles 范围读取，绝不能下载 `transportation.pmtiles` 或 `places.pmtiles` 整档。
+- `--overture-detail` 不依赖保存下来的独立建筑开关：`apply_feature_needs` 和 GUI 下载计划都会自动请求 Overture 建筑；`--no-buildings` 仍优先关闭全部建筑补充。
+- Overture 完整层只能按 PMTiles 范围读取，绝不能下载 `buildings`、`transportation` 或 `places` PMTiles 整档。
 - 详细层失败或部分瓦片损坏时保留 OSM 底图继续生成；`--prewarm` 和 `--offline` 的完整性由缓存文件和 `net::note_uncached` 报告。
 - GUI 与 CLI 共用 `Args`，新增字段通常需要同时处理参数解析、GUI 标志构造和本地化。
 - GUI 文案改动应同步 `src/gui/locales/en-US.json`，并检查其他翻译是否保留占位符。

@@ -241,9 +241,9 @@ pub struct Args {
     #[arg(long = "overture", default_value_t = true, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub overture: bool,
 
-    /// Add monthly Overture Maps road, railway and named-place data on top of OpenStreetMap.
-    /// This reads only the vector tiles touching the selected area. Places can fill in named
-    /// shops, schools, hospitals and stations in smaller Chinese cities and counties.
+    /// Add the complete monthly Overture Maps detail layer on top of OpenStreetMap:
+    /// buildings, roads, railways and named places. This reads only the vector tiles touching
+    /// the selected area. It is the most complete openly available layer for Chinese counties.
     #[arg(long = "overture-detail", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub overture_detail: bool,
 
@@ -1764,8 +1764,10 @@ pub const DISASTER_GROUND_LEVEL: i32 = -40;
 /// beside Animals, and need mob griefing for their meteors to crater, so both keep natural
 /// spawning off.
 pub fn apply_feature_needs(args: &mut Args) {
-    // Overture only adds buildings and Mapillary only dresses them, so --no-buildings has
-    // nothing to fetch.
+    // The detailed data mode is one complete Overture package. Its building layer must not be
+    // silently left behind when a persisted "Additional Buildings" toggle happens to be off.
+    // --no-buildings still wins because both layers have nothing to render without buildings.
+    args.overture |= args.overture_detail;
     args.overture &= args.buildings;
     if !args.buildings {
         args.mapillary_facades = Some(false);
@@ -3689,6 +3691,18 @@ mod tests {
         };
         assert_eq!(fetched(&[]), (true, true));
         assert_eq!(fetched(&["--no-buildings"]), (false, false));
+    }
+
+    #[test]
+    fn detailed_overture_data_always_includes_buildings() {
+        let fetched = |extra: &[&str]| {
+            let mut args = Args::parse_from(["arnis", "--bbox", "1,2,3,4"].iter().chain(extra));
+            args.overture = false;
+            apply_feature_needs(&mut args);
+            args.overture
+        };
+        assert!(fetched(&["--overture-detail"]));
+        assert!(!fetched(&["--overture-detail", "--no-buildings"]));
     }
 
     #[test]

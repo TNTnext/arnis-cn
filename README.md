@@ -32,15 +32,16 @@ arnis --china-province=beijing --output-dir="C:/YOUR_PATH/.minecraft/saves" --bb
 
 Existing global terrain, land-cover and building sources continue to supplement the selected OSM extract.
 
-### Detailed China road and place data
+### Complete detailed China data
 
-For counties and smaller cities such as Taicang, the most useful setup is a layered one: use **China Nationwide** or **China Province** for the OpenStreetMap base map, then enable **Detailed Map Data → Overture Monthly Detail**. This adds:
+For counties and smaller cities such as Taicang, the most complete setup is: use **China Nationwide** or **China Province** for the OpenStreetMap base map, then enable **Detailed Map Data → Overture Complete**. The single toggle now adds all available Overture detail layers together:
 
+- Overture `buildings`: missing building footprints and height attributes. Overture's global aggregate is the broadest openly downloadable building collection and combines OpenStreetMap, Microsoft ML buildings, the East Asian building dataset and other compatible open sources.
 - Overture `transportation`: recent roads and railways, merged only where they are not already present in the OSM base.
 - Overture `places`: newer named shops, restaurants, schools, hospitals, stations and other points of interest. A place inside an OSM building labels that building; other places become standalone named nodes.
-- The existing Overture building footprints, ESA WorldCover land cover and Copernicus elevation sources.
+- ESA WorldCover land cover and Copernicus elevation remain active as before.
 
-The detailed layer is intentionally separate from the building-footprint toggle. It is off by default so existing standard downloads do not grow unexpectedly. Both choices are independent: **OSM Data Source** selects the base map, while **Detailed Map Data** selects whether the monthly Overture road/place layer is added.
+Overture Complete is off by default so standard downloads do not grow unexpectedly. When it is selected, the Overture building layer is included automatically even if the older standalone **Additional Buildings** switch was previously saved as off. `--no-buildings` still disables both.
 
 The Overture archives are planet-scale and the transportation archive is over 100 GB. Arnis never downloads either archive whole: it reads the PMTiles header, directory pages and only the z14 tiles that intersect the selected area. These pieces are cached per monthly release, so `--prewarm` can prepare a county for a later `--offline` run.
 
@@ -48,9 +49,9 @@ The Overture archives are planet-scale and the transportation archive is over 10
 arnis --china-province=jiangsu --overture-detail --output-dir="C:/YOUR_PATH/.minecraft/saves" --bbox="31.34,121.00,31.56,121.27"
 ```
 
-No single public dataset makes every lane and business in every Chinese county complete and current. The combination is deliberately additive: OSM remains authoritative for mapped roads, buildings and local geometry, while Overture fills gaps and contributes a newer monthly snapshot. A small county can still have sparse coverage in one layer; the Download Plan reports what the selected area will read and cache.
+Overture is the broadest open aggregate, but no public dataset can guarantee every lane, business and building in every Chinese village. The combination remains deliberately additive: OSM stays authoritative for mapped local geometry, while Overture fills missing buildings, roads and places from a newer monthly snapshot. The Download Plan reports what the selected area will read and cache.
 
-Attribution and licenses: OpenStreetMap data is under the [ODbL](https://www.openstreetmap.org/copyright). Overture [transportation](https://docs.overturemaps.org/schema/reference/transportation/segment/) is under the ODbL. Overture [places](https://docs.overturemaps.org/schema/reference/places/place/) combines sources under permissive licenses including CDLA-Permissive-2.0, Apache-2.0 and CC0. See [Overture attribution](https://docs.overturemaps.org/attribution/) for the complete source list.
+Attribution and licenses: OpenStreetMap data is under the [ODbL](https://www.openstreetmap.org/copyright). Overture [buildings](https://docs.overturemaps.org/guides/buildings/) and [transportation](https://docs.overturemaps.org/schema/reference/transportation/segment/) are under the ODbL. Overture [places](https://docs.overturemaps.org/schema/reference/places/place/) combines sources under permissive licenses including CDLA-Permissive-2.0, Apache-2.0 and CC0. See [Overture attribution](https://docs.overturemaps.org/attribution/) for the complete source list.
 
 ### Special building shapes
 

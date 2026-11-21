@@ -58,6 +58,13 @@ GUI 最终会拼接 CLI flags。新增选项通常需要同步：
 - 全国、省份和旧 PBF 来源互斥；切回 Default、Local Archive 或 Region Download 后不能残留中国来源参数。
 - 来源或省份变化后，已打开的 Data Plan 需要刷新。
 
+Overture 完整数据额外要求：
+
+- `--overture-detail` 必须同时启用 Overture 建筑；不能因为持久化的旧 “Additional Buildings” 开关为关闭而只补道路和地点。
+- `--no-buildings` 优先于完整数据模式，关闭建筑时也不再请求 Overture 建筑。
+- GUI 下载计划必须执行与 `apply_feature_needs` 相同的组合规则，避免任务实际下载与界面计划不一致。
+- `buildings`、`transportation`、`places` 都只能按 PMTiles 范围读取相交瓦片，不能下载整档。
+
 ## 本地化
 
 - locale 使用带占位符的 JSON。

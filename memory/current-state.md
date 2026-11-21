@@ -181,6 +181,33 @@ http.curloptResolve=github.com:443:140.82.112.4
 - 下一步：
   - 可继续为 `attraction` 或特定 Wikidata 天文馆补充专用模型，但不应替代通用标签推断。
 
+## 2026-11-21：Overture 完整数据纳入建筑并验证太仓覆盖
+
+- 根因：
+  - GUI 的“详细地图数据”以前只发送 `--overture-detail`，而建筑是否请求仍取决于独立保存的 “Additional Buildings”。
+  - 用户保存过建筑补充关闭时，选择详细数据只会补道路和地点，生成结果可能没有额外建筑。
+- 修改：
+  - `apply_feature_needs` 与 GUI 下载计划统一为 `overture = (overture_enabled || overture_detail) && buildings`。
+  - “详细地图数据”改名为 “Overture 完整数据 / Overture Complete”，一个开关同时请求建筑、道路、铁路和具名地点。
+  - `--no-buildings` 保持最高优先级，仍会关闭 Overture 建筑。
+  - README、中英文界面、许可说明、下载计划名称和 GUI 测试同步更新。
+  - 增加默认 ignored 的太仓网络集成测试，防止以后回归成“只有道路地点、没有建筑”。
+- 验证：
+  - 本机 Rust stable 从 1.93.0 更新到 1.100.0；旧工具链编译 `libsqlite3-sys 0.38.0` 时错误使用 unstable `cfg_select` 的问题消失。
+  - `args::tests::detailed_overture_data_always_includes_buildings` 通过。
+  - `tests/gui/detail-source.mjs` 与 `tests/gui/china-source.mjs` 通过。
+  - `cargo test --features gui`：3180 passed、0 failed、26 ignored；离线集成测试 1 passed、1 ignored，接缝测试 0 passed、1 ignored。
+  - `cargo build --release --features gui` 通过，生成 `target/release/arnis.exe`，大小 81,452,032 字节，SHA-256 为 `0545AEED88639315382762AA5FA3A5989BD2539188843713A03004969FFE0D7F`。
+  - 太仓范围 `31.42,121.08,31.48,121.18` 使用 Overture `2026-11-18.0`，24 个覆盖瓦片全部有数据，读取 21,228 个建筑，网络只传输约 1.69 MB，耗时 17 秒。
+- 数据结论：
+  - Overture 月度建筑汇总是当前可开放下载、适合 Arnis 按范围读取的最广公开方案；它汇总 OSM、Microsoft ML Buildings、东亚建筑数据集及其他兼容来源。
+  - 不再单独接入 Zenodo 东亚建筑集，因为它已进入 Overture 汇总，重复接入会增加下载、存储和空间去重风险。
+- 已知限制：
+  - 没有任何公开数据集能保证中国每个村庄都逐栋完整；Overture 仍是目前最广的开放汇总，不是商业级实时测绘保证。
+  - Overture 建筑主要是轮廓，特殊建筑穹顶仍需 OSM/Overture 地点标签或显式形状命中。
+- 下一步：
+  - 如需继续提升“最近新建小区”覆盖率，应评估有稳定许可的国内商业地图 API，而不是叠加更多重复的公开建筑集。
+
 ## 追加记录格式
 
 后续记录使用以下结构：

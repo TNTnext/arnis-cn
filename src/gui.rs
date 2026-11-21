@@ -2541,7 +2541,10 @@ fn gui_data_plan(
     args.measured_heights = measured_heights_enabled;
     args.measured_roofs = measured_roofs_enabled;
     args.lidar_max_mb = lidar_max_mb;
-    args.overture = overture_enabled;
+    // The complete detail mode includes the Overture building layer even when the older
+    // standalone building toggle was previously saved as off.
+    args.overture = overture_enabled || args.overture_detail;
+    args.overture &= args.buildings;
     args.aws_only_elevation = aws_only_elevation;
     let bbox = LLBBox::from_str(&bbox_text)?;
     Ok(crate::data_plan::plan(&cache_root(), &args, bbox))
