@@ -91,6 +91,10 @@ impl Ring {
 /// with thousands of features allocates no string per attribute.
 #[derive(Debug, Clone)]
 pub struct Feature {
+    /// The MVT `Feature.id`, which is independent of any key/value attribute.
+    /// Overture-derived archives usually carry a GERS string in `id`, while
+    /// VIDA Open Buildings uses this numeric field for a stable footprint id.
+    pub id: Option<u64>,
     pub geom_type: u32,
     /// Flat `(key_index, value_index)` pairs, as the format stores them.
     pub tags: Vec<u32>,
@@ -350,13 +354,16 @@ fn decode_value(reader: &mut Reader<'_>) -> Result<Value> {
 }
 
 fn decode_feature(reader: &mut Reader<'_>) -> Result<Feature> {
+    let mut id = None;
     let mut geom_type = 0u32;
     let mut tags: Vec<u32> = Vec::new();
     let mut geometry: Vec<u32> = Vec::new();
 
     while let Some((field, wire)) = reader.key()? {
         match field {
-            // Feature.id - not used; Overture's own `id` attribute is the GERS id.
+            // Feature.id. Overture also has a GERS `id` attribute, but other
+            // publishers such as VIDA put their stable identifier here only.
+            1 if wire == WIRE_VARINT => id = Some(reader.varint()?),
             1 => reader.skip(wire)?,
             2 => reader.packed_u32(wire, &mut tags)?,
             3 if wire == WIRE_VARINT => {
@@ -368,6 +375,7 @@ fn decode_feature(reader: &mut Reader<'_>) -> Result<Feature> {
     }
 
     Ok(Feature {
+        id,
         geom_type,
         tags,
         rings: decode_geometry(&geometry),

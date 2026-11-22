@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 /// One data source of the run.
 #[derive(serde::Serialize, Debug, PartialEq)]
 pub struct Item {
-    /// `osm`, `elevation`, `land_cover`, `overture` or `overture_detail`.
+    /// `osm`, `elevation`, `land_cover`, `overture`, `overture_detail`,
+    /// `open_buildings_vida`, `cnbh_heights` or `overture_base`.
     pub source: &'static str,
     pub cached: usize,
     /// What the cached files take on disk.
@@ -103,6 +104,11 @@ const TYPICAL_ELEVATION_TILE: u64 = 72_000;
 const TYPICAL_LAND_COVER_TILE: u64 = 38_000;
 const TYPICAL_OVERTURE_TILE: u64 = 142_000;
 const TYPICAL_OVERTURE_DETAIL_TILE: u64 = 180_000;
+const TYPICAL_OPEN_BUILDINGS_TILE: u64 = 210_000;
+// A 2-degree CNBH GeoTIFF is a single compressed raster, not a small tile.
+// This estimate is replaced by the real file size as soon as one is cached.
+const TYPICAL_CNBH_FILE: u64 = 500_000_000;
+const TYPICAL_OVERTURE_BASE_TILE: u64 = 165_000;
 
 fn count(source: &'static str, files: Option<Vec<PathBuf>>, typical: u64) -> Item {
     let files = files.unwrap_or_default();
@@ -265,6 +271,24 @@ pub fn plan(root: &Path, args: &Args, bbox: LLBBox) -> DataPlan {
             TYPICAL_OVERTURE_DETAIL_TILE,
         ));
     }
+    if args.open_buildings_vida && !args.skip_objects() {
+        let files = crate::overture::open_buildings_cache_files(root, &bbox);
+        out.items.push(count(
+            "open_buildings_vida",
+            files,
+            TYPICAL_OPEN_BUILDINGS_TILE,
+        ));
+    }
+    if args.cnbh_heights && !args.skip_objects() {
+        let files = crate::cnbh::cache_files(root, &bbox);
+        out.items
+            .push(count("cnbh_heights", files, TYPICAL_CNBH_FILE));
+    }
+    if args.overture_base && !args.skip_objects() {
+        let files = crate::overture::base_cache_files(root, &bbox);
+        out.items
+            .push(count("overture_base", files, TYPICAL_OVERTURE_BASE_TILE));
+    }
     out
 }
 
@@ -401,6 +425,39 @@ mod tests {
         let detail = plan(root, &detail_flag, bbox);
         assert_eq!(item(&detail, "overture_detail").cached, 1);
         assert_eq!(item(&detail, "overture_detail").cached_bytes, 321);
+
+        // VIDA Open Buildings has its own cache root and needs no release marker.
+        let vida_flag = args(&["--open-buildings-vida"]);
+        let vida = plan(root, &vida_flag, bbox);
+        let vida_item = item(&vida, "open_buildings_vida");
+        assert!(vida_item.total > 0 && vida_item.cached == 0);
+        let vida_files = crate::overture::open_buildings_cache_files(root, &bbox).unwrap();
+        touch(&vida_files[0], 456);
+        let vida = plan(root, &vida_flag, bbox);
+        assert_eq!(item(&vida, "open_buildings_vida").cached, 1);
+        assert_eq!(item(&vida, "open_buildings_vida").cached_bytes, 456);
+
+        // Overture base follows the accepted monthly release and reads z13 tiles.
+        let base_flag = args(&["--overture-base"]);
+        let base = plan(root, &base_flag, bbox);
+        let base_item = item(&base, "overture_base");
+        assert!(base_item.total > 0);
+        let base_files = crate::overture::base_cache_files(root, &bbox).unwrap();
+        touch(&base_files[0], 789);
+        let base = plan(root, &base_flag, bbox);
+        assert_eq!(item(&base, "overture_base").cached, 1);
+        assert_eq!(item(&base, "overture_base").cached_bytes, 789);
+
+        // CNBH is a 2-degree GeoTIFF rather than a PMTiles tile. Its plan
+        // tracks the same cache file the fetch path will download.
+        let cnbh_flag = args(&["--cnbh-heights"]);
+        let cnbh = plan(root, &cnbh_flag, bbox);
+        assert_eq!(item(&cnbh, "cnbh_heights").total, 1);
+        let cnbh_files = crate::cnbh::cache_files(root, &bbox).unwrap();
+        touch(&cnbh_files[0], 654);
+        let cnbh = plan(root, &cnbh_flag, bbox);
+        assert_eq!(item(&cnbh, "cnbh_heights").cached, 1);
+        assert_eq!(item(&cnbh, "cnbh_heights").cached_bytes, 654);
 
         // Local Archive: the folder's cells, nothing to download.
         let local = root.join("local-archive");

@@ -210,7 +210,7 @@ const SEARCH_WORDS = {
   'meld-offline-toggle': 'no internet network cache',
   'meld-overpass-input': 'server osm',
   'meld-osm-source-group': 'openstreetmap data geofabrik china nationwide province source',
-  'meld-detail-data-group': 'detailed complete detail overture buildings houses roads railways places poi shop school hospital station monthly recent 完整 详细 数据 建筑 房屋 道路 地点',
+  'meld-detail-data-group': 'detailed complete detail overture china enhanced maximum open data buildings houses roads railways places poi shop school hospital station monthly recent water land use 3d height 完整 详细 数据 中国 增强 最高 建筑 房屋 道路 地点 水体 土地利用 三维 高度',
   'meld-china-province-select': 'china province beijing shanghai osm france 中国 省',
   'meld-origin-input': 'coordinates latitude longitude',
 };

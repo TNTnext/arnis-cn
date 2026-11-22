@@ -43,6 +43,9 @@ Arnis 把真实地理位置转换为体素游戏世界。输入核心是 OpenStr
 - 默认在线获取缺失数据。
 - `--china-national` 从 OpenStreetMap France 下载完整的中国 PBF，缓存一次后在本地裁切所选区域；GUI 中对应“中国全国数据”。
 - `--china-province <PROVINCE>` 从 OpenStreetMap France 下载所选中国省级 PBF，缓存一次后在本地裁切；GUI 中对应“中国省级数据”。
+- `--map-data-profile=standard|overture|china-plus|maximum` 在 GUI 的“详细地图数据”中切换四档开放图层组合。
+- “中国增强”加入 CNBH-10m 中国建筑高度；“最高完整度”再加入 Overture 水体、土地利用和土地覆盖。
+- VIDA China Open Buildings 保留为独立可选的 `--open-buildings-vida` 轮廓补充，不属于四档累计组合。
 - `--prewarm` 只准备区域缓存，不写世界。
 - `--offline` 只使用已有缓存，缺数据时停止。
 - `--file` 可直接从本地 OSM 输入生成，适合可重复测试。
@@ -51,6 +54,8 @@ Arnis 把真实地理位置转换为体素游戏世界。输入核心是 OpenStr
 中国全国数据源为 `https://download.openstreetmap.fr/extracts/asia/china-latest.osm.pbf`，数据来自 OpenStreetMap，许可为 ODbL，实测文件约 1.785 GB。全国 PBF 是完整国家包，不会一次生成整个国家；Arnis 仍按当前 bbox 在本地裁切。
 
 中国省级数据覆盖 33 个省级/特别区域，包括香港、澳门、内蒙古等。`hong-kong` 和 `inner-mongolia` 是 CLI/GUI 值，下载文件名分别使用 `hong_kong` 与 `inner_mongolia`。
+
+详细来源、缓存位置、许可和 3D 限制见 `memory/data-sources.md`。
 
 缓存目录、世界输出和调试图片通常不进入仓库。
 

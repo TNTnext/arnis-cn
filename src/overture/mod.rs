@@ -25,16 +25,25 @@
 //! transport downloads is cached under the release it came from (see [`cache`])
 //! and never needs revalidating.
 
+mod base;
 mod cache;
 mod detail;
 mod mvt;
+mod open_buildings;
 pub(crate) mod pmtiles;
 mod tiles;
 pub(crate) use tiles::cache_files as tile_cache_files;
 
+pub use base::{
+    cache_files as base_cache_files, fetch_overture_base, merge_base, OvertureBaseData,
+};
 pub use cache::{cache_root, clear_overture_cache};
 pub use detail::{
     cache_files as detail_cache_files, fetch_overture_detail, merge_detail, OvertureDetailData,
+};
+pub use open_buildings::{
+    cache_files as open_buildings_cache_files, cache_root as open_buildings_cache_root,
+    clear_cache as clear_open_buildings_cache, fetch_open_buildings, OpenBuildingsData,
 };
 
 /// What a fetch actually cost, so the two transports can be compared on
@@ -746,7 +755,10 @@ pub fn drop_footprints_in_water(
     scale: f64,
 ) -> usize {
     use crate::land_cover::{osm_land_override::SHORE_BAND_M, LC_WATER};
-    let overture = |el: &ProcessedElement| el.id() & OVERTURE_ID_HIGH_BIT != 0;
+    let overture = |el: &ProcessedElement| {
+        open_buildings::is_external_footprint_id(el.id())
+            && (el.tags().contains_key("building") || el.tags().contains_key("building:part"))
+    };
     if !elements.iter().any(overture) {
         return 0;
     }
@@ -794,7 +806,8 @@ impl Decks {
         for el in elements {
             match el {
                 ProcessedElement::Way(way)
-                    if way.id & OVERTURE_ID_HIGH_BIT == 0 && is_over_water_structure(&way.tags) =>
+                    if !open_buildings::is_external_footprint_id(way.id)
+                        && is_over_water_structure(&way.tags) =>
                 {
                     let area = way.tags.get("area").map(String::as_str) != Some("no");
                     if !(area && decks.add_area(&way.nodes)) {
@@ -872,7 +885,10 @@ fn drop_where_wet(
             }
             all => all,
         };
-        if way.id & OVERTURE_ID_HIGH_BIT == 0 || corners.is_empty() {
+        if !open_buildings::is_external_footprint_id(way.id)
+            || (!way.tags.contains_key("building") && !way.tags.contains_key("building:part"))
+            || corners.is_empty()
+        {
             return true;
         }
         let n = corners.len() as i64;

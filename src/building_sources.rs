@@ -4,9 +4,11 @@
 //! a step out.
 
 use crate::coordinate_system::cartesian::XZBBox;
+use crate::coordinate_system::geographic::LLBBox;
 use crate::ground::Ground;
 use crate::osm_parser::ProcessedElement;
-use crate::overture::{self, OvertureData};
+use crate::overture::{self, OpenBuildingsData, OvertureData};
+use crate::projection::ProjectionSpec;
 use colored::Colorize;
 
 /// Adds to the parsed OSM elements, in this order, each filling only what the
@@ -16,8 +18,10 @@ use colored::Colorize;
 ///    beats Overture's estimate);
 /// 2. Overture's heights for the buildings still without;
 /// 3. Overture's own buildings where OSM has none;
-/// 4. the roof shapes the laser saw, for outlines of either without one;
-/// 5. the sheds, garages and pools garden detail measured where nothing mapped
+/// 4. VIDA China Open Buildings where OSM and Overture both have none;
+/// 5. CNBH-10m estimated heights for Chinese buildings still without one;
+/// 6. the roof shapes the laser saw, for outlines of either without one;
+/// 7. the sheds, garages and pools garden detail measured where nothing mapped
 ///    stands.
 ///
 /// `overture_wanted` says whether the run asked Overture for buildings, for the
@@ -25,6 +29,10 @@ use colored::Colorize;
 pub fn merge(
     parsed_elements: &mut Vec<ProcessedElement>,
     overture: OvertureData,
+    open_buildings: OpenBuildingsData,
+    cnbh: crate::cnbh::CnbhData,
+    bbox: &LLBBox,
+    projection: ProjectionSpec,
     ground: &Ground,
     xzbbox: &XZBBox,
     overture_wanted: bool,
@@ -68,6 +76,21 @@ pub fn merge(
     } else if overture_wanted && enriched == 0 {
         println!("  No additional buildings from Overture Maps for this area");
     }
+
+    if !open_buildings.elements.is_empty() {
+        let before_count = parsed_elements.len();
+        let unique = overture::deduplicate_against_osm(open_buildings.elements, parsed_elements);
+        parsed_elements.extend(unique);
+        let added = parsed_elements.len() - before_count;
+        if added > 0 {
+            println!(
+                "  Added {} buildings from VIDA China Open Buildings",
+                added.to_string().bright_white().bold()
+            );
+        }
+    }
+
+    crate::cnbh::apply_heights(parsed_elements, cnbh, bbox, projection, xzbbox);
 
     // Overture's footprints too: any outline the laser saw a roof over.
     let measured_roofs = crate::survey::roofs::apply(parsed_elements, ground, xzbbox, scale);
@@ -187,6 +210,10 @@ mod tests {
         merge(
             &mut elements,
             OvertureData::default(),
+            OpenBuildingsData::default(),
+            crate::cnbh::CnbhData::default(),
+            &LLBBox::new(0.0, 0.0, 0.001, 0.001).unwrap(),
+            ProjectionSpec::local(1.0),
             &ground(),
             &xzbbox,
             false,

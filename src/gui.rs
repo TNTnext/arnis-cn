@@ -1314,6 +1314,8 @@ fn cache_size_string() -> String {
     total = total.saturating_add(dir_size_bytes(&crate::survey::cache_root()));
     // Its own root beside the tile cache, and Clear Cache deletes it.
     total = total.saturating_add(dir_size_bytes(&crate::overture::cache_root()));
+    total = total.saturating_add(dir_size_bytes(&crate::overture::open_buildings_cache_root()));
+    total = total.saturating_add(dir_size_bytes(&crate::cnbh::cache_root()));
     for d in [crate::osm_tiles::cache_root(), crate::osm_pbf::cache_dir()]
         .into_iter()
         .flatten()
@@ -1394,6 +1396,8 @@ fn clear_tile_caches_now() -> Result<String, String> {
         .combined(crate::canopy::clear_canopy_cache())
         .combined(crate::survey::clear_cache())
         .combined(crate::overture::clear_overture_cache())
+        .combined(crate::overture::clear_open_buildings_cache())
+        .combined(crate::cnbh::clear_cache())
         .combined(crate::osm_tiles::clear_osm_tiles_cache())
         .combined(crate::osm_pbf::clear_osm_pbf_cache())
         .combined(clear_model_caches());
@@ -2298,6 +2302,7 @@ const WINDOW_FLAGS: &[&str] = &[
     "blinear-level",
     "china-national",
     "china-province",
+    "map-data-profile",
     "overture-detail",
     "osm-pbf",
     "osm-pbf-url",
@@ -2545,6 +2550,7 @@ fn gui_data_plan(
     // standalone building toggle was previously saved as off.
     args.overture = overture_enabled || args.overture_detail;
     args.overture &= args.buildings;
+    crate::args::apply_feature_needs(&mut args);
     args.aws_only_elevation = aws_only_elevation;
     let bbox = LLBBox::from_str(&bbox_text)?;
     Ok(crate::data_plan::plan(&cache_root(), &args, bbox))
@@ -3667,6 +3673,35 @@ fn gui_start_generation(
                             overture::OvertureDetailData::default()
                         }
                     });
+                    let open_buildings_handle = s.spawn(|| {
+                        if args.open_buildings_vida && !args.skip_objects() {
+                            overture::fetch_open_buildings(
+                                &bbox,
+                                &crate::projection::ProjectionSpec::from_args(&args),
+                                args.debug,
+                            )
+                        } else {
+                            overture::OpenBuildingsData::default()
+                        }
+                    });
+                    let cnbh_handle = s.spawn(|| {
+                        if args.cnbh_heights && !args.skip_objects() {
+                            crate::cnbh::fetch_cnbh(&bbox, args.debug)
+                        } else {
+                            crate::cnbh::CnbhData::default()
+                        }
+                    });
+                    let base_handle = s.spawn(|| {
+                        if args.overture_base && !args.skip_objects() {
+                            overture::fetch_overture_base(
+                                &bbox,
+                                &crate::projection::ProjectionSpec::from_args(&args),
+                                args.debug,
+                            )
+                        } else {
+                            overture::OvertureBaseData::default()
+                        }
+                    });
                     let ground_handle = s.spawn(|| {
                         in_pool(run_pool.as_deref(), || {
                             ground::generate_ground_data(&args, bbox, &peaks)
@@ -3709,6 +3744,18 @@ fn gui_start_generation(
                         );
                         overture::OvertureDetailData::default()
                     });
+                    let open_buildings = open_buildings_handle.join().unwrap_or_else(|_| {
+                        eprintln!("VIDA China Open Buildings failed, continuing without it.");
+                        overture::OpenBuildingsData::default()
+                    });
+                    let cnbh_heights = cnbh_handle.join().unwrap_or_else(|_| {
+                        eprintln!("CNBH building heights failed, continuing without them.");
+                        crate::cnbh::CnbhData::default()
+                    });
+                    let overture_base = base_handle.join().unwrap_or_else(|_| {
+                        eprintln!("Overture base surfaces failed, continuing without them.");
+                        overture::OvertureBaseData::default()
+                    });
                     if let (Some(tx), Ok(raw)) = (&peak_tx, fetch_result.as_ref()) {
                         if crate::elevation::TerrainHints::wants_overture(&args) {
                             let _ = tx.send(crate::elevation::TerrainHints::from_overture(
@@ -3724,12 +3771,23 @@ fn gui_start_generation(
                     (
                         fetch_result,
                         overture_data,
+                        open_buildings,
+                        cnbh_heights,
                         overture_detail,
+                        overture_base,
                         ground_handle.join().ok(),
                     )
                 })
             };
-            let (fetch_result, overture_data, overture_detail, ground) = off_worker(fetch_all);
+            let (
+                fetch_result,
+                overture_data,
+                open_buildings,
+                cnbh_heights,
+                overture_detail,
+                overture_base,
+                ground,
+            ) = off_worker(fetch_all);
 
             offline_complete()?;
             let Some(ground) = ground else {
@@ -3784,12 +3842,17 @@ fn gui_start_generation(
                     crate::building_sources::merge(
                         &mut parsed_elements,
                         overture_data,
+                        open_buildings,
+                        cnbh_heights,
+                        &bbox,
+                        crate::projection::ProjectionSpec::from_args(&args),
                         &ground,
                         &xzbbox,
                         args.overture && !args.skip_objects(),
                         args.scale,
                     );
                     overture::merge_detail(&mut parsed_elements, overture_detail);
+                    overture::merge_base(&mut parsed_elements, overture_base);
 
                     osm_parser::sort_by_priority(&mut parsed_elements);
 
@@ -4316,12 +4379,14 @@ mod tests {
             "--osm-pbf-url=https://example.org/x.osm.pbf",
             "--osm-tiles-url=archive",
             "--overpass-url=https://a.example,https://b.example",
+            "--map-data-profile=maximum",
             "--offline",
         ]
         .map(String::from)
         .to_vec();
         let extra = window_flag_args(&flags, false, "java", true).unwrap();
         assert!(!extra.buildings && extra.world_border && extra.disable_height_limit);
+        assert_eq!(extra.map_data_profile, crate::args::MapDataProfile::Maximum);
         assert!(extra.offline && extra.overpass_url.len() == 2 && extra.osm_pbf.is_some());
         let one = ["--origin=44.4,26.1".to_string()];
         assert!(window_flag_args(&one, true, "java", false)

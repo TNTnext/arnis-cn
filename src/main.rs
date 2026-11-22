@@ -17,6 +17,7 @@ mod celestial;
 mod climate;
 mod climate_field;
 mod clipping;
+mod cnbh;
 mod colors;
 mod coordinate_system;
 mod data_plan;
@@ -902,9 +903,32 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
             "  [+]".bold()
         );
     }
+    if args.open_buildings_vida && !skip_objects {
+        println!("{} Fetching VIDA China Open Buildings...", "  [+]".bold());
+    }
+    if args.cnbh_heights && !skip_objects {
+        println!(
+            "{} Fetching CNBH-10m China building heights...",
+            "  [+]".bold()
+        );
+    }
+    if args.overture_base && !skip_objects {
+        println!(
+            "{} Fetching Overture base water and land use...",
+            "  [+]".bold()
+        );
+    }
     let fetch_start = std::time::Instant::now();
     let (peak_tx, peaks) = crate::elevation::PeakSource::channel();
-    let (raw_data, overture_data, overture_detail, mut ground) = std::thread::scope(|s| {
+    let (
+        raw_data,
+        overture_data,
+        open_buildings,
+        cnbh_heights,
+        overture_detail,
+        overture_base,
+        mut ground,
+    ) = std::thread::scope(|s| {
         // Owned here, so a panic below drops it and the terrain thread stops waiting.
         let peak_tx = peak_tx;
         let overture_handle = s.spawn(|| {
@@ -931,6 +955,41 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
                 )
             } else {
                 overture::OvertureDetailData::default()
+            };
+            (data, t.elapsed())
+        });
+        let open_buildings_handle = s.spawn(|| {
+            let t = std::time::Instant::now();
+            let data = if args.open_buildings_vida && !skip_objects {
+                overture::fetch_open_buildings(
+                    &effective_bbox,
+                    &projection::ProjectionSpec::from_args(&args),
+                    args.debug,
+                )
+            } else {
+                overture::OpenBuildingsData::default()
+            };
+            (data, t.elapsed())
+        });
+        let cnbh_handle = s.spawn(|| {
+            let t = std::time::Instant::now();
+            let data = if args.cnbh_heights && !skip_objects {
+                cnbh::fetch_cnbh(&effective_bbox, args.debug)
+            } else {
+                cnbh::CnbhData::default()
+            };
+            (data, t.elapsed())
+        });
+        let base_handle = s.spawn(|| {
+            let t = std::time::Instant::now();
+            let data = if args.overture_base && !skip_objects {
+                overture::fetch_overture_base(
+                    &effective_bbox,
+                    &projection::ProjectionSpec::from_args(&args),
+                    args.debug,
+                )
+            } else {
+                overture::OvertureBaseData::default()
             };
             (data, t.elapsed())
         });
@@ -1002,6 +1061,37 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
             )
         });
         bench.report("overture_detail_fetch", detail_dur);
+        let (open_buildings, open_buildings_dur) =
+            open_buildings_handle.join().unwrap_or_else(|_| {
+                eprintln!(
+                    "{} VIDA China Open Buildings failed, continuing without it.",
+                    "Warning:".yellow().bold()
+                );
+                (
+                    overture::OpenBuildingsData::default(),
+                    std::time::Duration::ZERO,
+                )
+            });
+        bench.report("open_buildings_fetch", open_buildings_dur);
+        let (cnbh_heights, cnbh_dur) = cnbh_handle.join().unwrap_or_else(|_| {
+            eprintln!(
+                "{} CNBH building heights failed, continuing without them.",
+                "Warning:".yellow().bold()
+            );
+            (cnbh::CnbhData::default(), std::time::Duration::ZERO)
+        });
+        bench.report("cnbh_fetch", cnbh_dur);
+        let (overture_base, base_dur) = base_handle.join().unwrap_or_else(|_| {
+            eprintln!(
+                "{} Overture base surfaces failed, continuing without them.",
+                "Warning:".yellow().bold()
+            );
+            (
+                overture::OvertureBaseData::default(),
+                std::time::Duration::ZERO,
+            )
+        });
+        bench.report("overture_base_fetch", base_dur);
         if crate::elevation::TerrainHints::wants_overture(&args) {
             let _ = peak_tx.send(crate::elevation::TerrainHints::from_overture(
                 &raw_data,
@@ -1017,7 +1107,15 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
         });
         bench.report("terrain_total", ground_dur);
 
-        (raw_data, overture_data, overture_detail, ground)
+        (
+            raw_data,
+            overture_data,
+            open_buildings,
+            cnbh_heights,
+            overture_detail,
+            overture_base,
+            ground,
+        )
     });
     bench.report("fetch_total", fetch_start.elapsed());
     bench.reset();
@@ -1099,12 +1197,17 @@ fn run_generation_cli(mut args: Args, asked_mob_spawning: args::MobSpawning) {
     building_sources::merge(
         &mut parsed_elements,
         overture_data,
+        open_buildings,
+        cnbh_heights,
+        &effective_bbox,
+        projection::ProjectionSpec::from_args(&args),
         &ground,
         &xzbbox,
         args.overture && !skip_objects,
         args.scale,
     );
     overture::merge_detail(&mut parsed_elements, overture_detail);
+    overture::merge_base(&mut parsed_elements, overture_base);
 
     osm_parser::sort_by_priority(&mut parsed_elements);
     bench.mark("sort_priority");

@@ -65,6 +65,16 @@ Overture 完整数据额外要求：
 - GUI 下载计划必须执行与 `apply_feature_needs` 相同的组合规则，避免任务实际下载与界面计划不一致。
 - `buildings`、`transportation`、`places` 都只能按 PMTiles 范围读取相交瓦片，不能下载整档。
 
+多数据档位额外要求：
+
+- `standard / overture / china-plus / maximum` 是累计关系，不能出现高档位反而少了低档位图层。
+- 非 Earth 天体在 `apply_body_defaults` 后必须保持 Overture、VIDA 和 base 图层关闭；`apply_feature_needs` 不能把 Moon/Mars 的图层重新打开。
+- 建筑合并顺序固定为 OSM → Overture → VIDA；VIDA 不能覆盖已有 OSM/Overture 建筑。随后 CNBH 只填补仍缺失的高度，再执行 LiDAR 高度、屋顶和花园细节。
+- CNBH 只能写入没有 `height`、没有 `building:levels` 且非 `building:part` 的建筑；不得覆盖映射、Overture 或实测高度。
+- CNBH 文件使用奇数 2° 网格命名（太仓为 `X121Y31`），只读取质心所在压缩块；VIDA 只保存建筑轮廓，不能描述成完整 3D 建筑高度库。
+- VIDA 和 Overture base 都只能读取范围相交瓦片；下载计划、缓存统计、清理缓存和离线预取必须覆盖对应缓存根。
+- Overture base 一个 feature 可以含多个 polygon。去重键要包含几何/分段，不能只按 feature ID，否则会只留下第一段。
+
 ## 本地化
 
 - locale 使用带占位符的 JSON。

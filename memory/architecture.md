@@ -22,7 +22,7 @@
 3. 检查磁盘与区域规模
 4. 并行获取 OSM、Overture、地形/土地覆盖和可选的街景与模型数据
 5. 解析 OSM，投影到 XZ 方块坐标
-6. 合并 OSM 与 Overture 建筑来源，再补充 Overture 道路、铁路和地点，按优先级排序
+6. 按 OSM → Overture → VIDA 合并建筑，再由 CNBH-10m 填补缺失高度，随后补充 Overture 道路、铁路、地点和水土表面并按优先级排序
 7. 应用旋转、轮廓裁剪和地表覆盖修正
 8. `data_processing::generate_world_with_options`
 9. 写出世界、设置出生点、构建附加数据包和 LOD
@@ -45,7 +45,10 @@
 - `climate.rs`、`climate_field.rs`、`ecoregion.rs`：气候和生态区
 - `canopy/`：树冠高度
 - `survey/`：LiDAR、航拍和测得细节
-- `overture/`：Overture 建筑轮廓、月度道路/铁路和具名地点；完整模式按选区读取 PMTiles 瓦片
+- `overture/`：Overture 建筑轮廓、月度道路/铁路、具名地点和 base 水土表面；完整模式按选区读取 PMTiles 瓦片
+- `overture/open_buildings.rs`：VIDA Google-Microsoft-OSM China Open Buildings；从约 700 MB 的 `CHN.pmtiles` 读取相交 z14 瓦片，跳过 OSM 来源行
+- `overture/base.rs`：Overture `base.pmtiles` 的水体、土地利用和土地覆盖；只读取相交 z13 瓦片，并跳过 OSM 来源几何
+- `cnbh.rs`：CNBH-10m 2020 中国建筑高度；按奇数 2° GeoTIFF 分片，缓存后只解码建筑质心所在的 256×256 压缩块
 - `mapillary/`：街景获取、匹配、立面重建
 - `models_3d/`：外部 3D 模型和体素化
 
@@ -102,6 +105,29 @@
 - 下载文件按 URL 进入现有 PBF 缓存；后续裁切、Data Plan、离线模式和 One World bake 均沿用原流水线。
 - 全国与省级选项互斥，也与 `--file`、`--osm-pbf` 和 `--osm-pbf-url` 互斥。
 - 中国来源在线下载失败时可回退默认来源；离线或显式本地文件不回退。One World 回退时会移除对应中国来源参数。
+
+## 四档地图数据组合
+
+`MapDataProfile` 在 `src/args.rs` 中定义，GUI 的设置值是：
+
+| CLI 值 | GUI | 展开后的数据源 |
+| --- | --- | --- |
+| `standard` | 标准数据 | OSM、地形、土地覆盖、独立建筑补充和已有 3D/实测流程 |
+| `overture` | Overture 完整数据 | 标准 + Overture buildings、transportation、places |
+| `china-plus` | 中国增强 | Overture 完整数据 + CNBH-10m 建筑高度 |
+| `maximum` | 最高完整度 | 中国增强 + Overture base water、land_use、land_cover |
+
+`apply_feature_needs` 在 Earth 上展开档位，并把建筑补充与 `--no-buildings` 协调。修路和地点在关闭建筑后仍可保留；水体与土地利用仍可用于地形。非 Earth 天体必须在 `apply_body_defaults` 后保持这些来源关闭。
+
+建筑来源的优先级是 OSM → Overture → VIDA。VIDA 只填补 OSM 和 Overture 都没有建筑的空间；CNBH 只给仍没有高度和楼层的建筑补估算值，再交给 LiDAR 屋顶、激光测量高度和花园细节流程。VIDA 是可选的独立轮廓层，不包含在四档组合内。
+
+缓存：
+
+- Overture 建筑/交通/地点/base：`arnis-overture-cache/<release>/tiles/<theme>/`
+- VIDA：`arnis-open-buildings-cache/CHN-2024-08-27/tiles/`
+- CNBH：`arnis-cnbh-cache/CNBH10m-2020/`
+
+下载计划、缓存大小统计和“清理缓存”都覆盖这些来源。PMTiles 读取路径只请求与范围相交的瓦片，不下载行星级档案整档。
 
 ## 测试结构
 

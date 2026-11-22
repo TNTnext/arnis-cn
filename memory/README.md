@@ -24,6 +24,7 @@
 | --- | --- |
 | `project-overview.md` | 产品定位、版本、技术栈和输出格式 |
 | `architecture.md` | 端到端数据流、源码模块地图和 GUI 结构 |
+| `data-sources.md` | 四档地图数据组合、来源 URL、缓存、许可和 3D 边界 |
 | `workflows.md` | 克隆状态、构建、测试、格式化和资源恢复 |
 | `invariants.md` | 排序、确定性、并行接缝、离线、格式兼容等约束 |
 | `current-state.md` | 当前提交、工作区状态和会话记录 |

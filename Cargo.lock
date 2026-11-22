@@ -240,6 +240,7 @@ dependencies = [
  "tauri-plugin-log",
  "tauri-plugin-shell",
  "tempfile",
+ "tiff",
  "tokio",
  "trash",
  "twox-hash 2.1.2",

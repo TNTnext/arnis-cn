@@ -841,7 +841,8 @@ button.setting-reason:focus-visible {
 }
 
 /* Several long source names: they wrap in the languages where they do not fit. */
-.settings-page #meld-osm-source-group {
+.settings-page #meld-osm-source-group,
+.settings-page #meld-detail-data-group {
   flex-wrap: wrap;
 }
 

@@ -234,7 +234,8 @@ export function meldFlags({ oneWorld, java, caves, extendHeight, lods, plan = fa
   const source = choice('meld-osm-source-group');
   if (source === 'china-national') f.push('--china-national');
   if (source === 'china') add('--china-province', value('meld-china-province-select'));
-  if (choice('meld-detail-data-group') === 'overture') f.push('--overture-detail=true');
+  const dataProfile = choice('meld-detail-data-group');
+  if (dataProfile !== 'standard') add('--map-data-profile', dataProfile);
   if (source === 'archive') add('--osm-tiles-url', value('meld-archive-folder-input') || defaultArchive);
   if (source === 'region') {
     f.push('--osm-pbf=geofabrik');
@@ -288,7 +289,7 @@ const FLAG_CONTROLS = [
   ['--tree-realm', 'meld-tree-realm-select', 'value', 'auto'], ['--cave-style', 'meld-cave-style-select', 'value', 'all-mix'],
   ['--cave-ores', 'meld-cave-ores-group', 'group', 'normal'], ['--river-bed', 'meld-river-bed-group', 'group', 'off'],
   ['--water-detail', 'meld-water-detail-group', 'group', 'default'], ['--climate-mode', 'meld-climate-mode-group', 'group', 'origin'],
-  ['--overture-detail', 'meld-detail-data-group', 'flag-group', 'standard'],
+  ['--map-data-profile', 'meld-detail-data-group', 'group', 'standard'],
   ['--osm-pbf-url', 'meld-pbf-url-input', 'value', ''], ['--overpass-url', 'meld-overpass-input', 'value', ''],
   ['--offline', 'meld-offline-toggle', 'toggle'], ['--origin', 'meld-origin-input', 'value', ''],
   ['--world-border', 'meld-world-border-toggle', 'toggle'], ['--region-format', 'meld-region-format-group', 'group', 'mca'],
@@ -312,6 +313,10 @@ function keptFlags(flags) {
 export function applyFlags(flags, rebuild = false) {
   const kept = keptFlags(flags);
   if (rebuild) kept.delete('--skip-built');
+  // Jobs written before the four map-data profiles carry this one flag.
+  if (!kept.has('--map-data-profile') && kept.has('--overture-detail')) {
+    kept.set('--map-data-profile', kept.get('--overture-detail') === 'false' ? 'standard' : 'overture');
+  }
   // The flags come from a world's manifest, which may be someone else's: a value is only taken when
   // the control offers it, and it never becomes part of a selector.
   const set = (id, kind, v) => {
@@ -339,8 +344,7 @@ export function applyFlags(flags, rebuild = false) {
     // Where the data comes from stays the user's own choice: a job never brings its servers along.
     if (SOURCE_FLAGS.has(flag)) continue;
     const v = kept.get(flag);
-    if (kind === 'flag-group') set(id, 'group', v === undefined ? fallback : 'overture');
-    else if (kind === 'value' || kind === 'group') set(id, kind, v === undefined ? fallback : String(v));
+    if (kind === 'value' || kind === 'group') set(id, kind, v === undefined ? fallback : String(v));
     else if (kind === 'on') set(id, 'toggle', v !== 'false');
     else set(id, 'toggle', kind === 'untoggle' ? v === undefined : v !== undefined);
   }
@@ -351,6 +355,10 @@ export function applyFlags(flags, rebuild = false) {
 export function jobFits(flags) {
   const kept = keptFlags(flags);
   if (!kept.has('--one-world-workers')) return false;
+  if (!kept.has('--map-data-profile') && kept.has('--overture-detail')) {
+    const legacy = kept.get('--overture-detail');
+    if (legacy !== true && legacy !== 'true' && legacy !== 'false') return false;
+  }
   return FLAG_CONTROLS.every(([flag, id, kind]) => {
     const v = kept.get(flag);
     if (v === undefined || SOURCE_FLAGS.has(flag)) return true;
@@ -1207,7 +1215,7 @@ function lines(box, rows) {
   box.hidden = false;
 }
 
-const SOURCE_NAMES = { osm: 'Map data', elevation: 'Elevation', land_cover: 'Land cover', overture: 'Building footprints', overture_detail: 'Buildings, roads and places', laser: 'Laser scans' };
+const SOURCE_NAMES = { osm: 'Map data', elevation: 'Elevation', land_cover: 'Land cover', overture: 'Building footprints', overture_detail: 'Buildings, roads and places', open_buildings_vida: 'China Open Buildings', cnbh_heights: 'CNBH building heights', overture_base: 'Water and land use', laser: 'Laser scans' };
 
 // `area()` is the selected bbox; `plan()` the settings a run's plan depends on; `baking(on)` hears
 // a Download & Bake start and end.

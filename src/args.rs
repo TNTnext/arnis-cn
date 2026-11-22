@@ -247,6 +247,29 @@ pub struct Args {
     #[arg(long = "overture-detail", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub overture_detail: bool,
 
+    /// One switch for the map-data package. `overture` adds Overture's complete
+    /// buildings, roads, railways and places. `china-plus` also adds CNBH-10m
+    /// building heights. `maximum` also adds Overture's water and land-use tiles.
+    #[arg(long = "map-data-profile", value_enum, default_value_t = MapDataProfile::Standard)]
+    pub map_data_profile: MapDataProfile,
+
+    /// Add VIDA / Google-Microsoft-OSM Open Buildings footprints for China.
+    /// This is a separate 700 MB PMTiles archive, read only where the selected
+    /// area touches it. OpenStreetMap-sourced rows are skipped.
+    #[arg(long = "open-buildings-vida", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
+    pub open_buildings_vida: bool,
+
+    /// Fill missing building heights in China from CNBH-10m (2020, 10 m
+    /// resolution, CC BY 4.0). Only buildings without an explicit height or
+    /// floor count are changed; OSM, Overture, VIDA and measured data win.
+    #[arg(long = "cnbh-heights", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
+    pub cnbh_heights: bool,
+
+    /// Add Overture's base-theme water, coastline, land-use and leisure polygons.
+    /// Only positive OSM-compatible source tags are added.
+    #[arg(long = "overture-base", default_value_t = false, action = ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
+    pub overture_base: bool,
+
     /// Which Overture transport to read. Both carry the same buildings.
     /// auto: vector tiles, falling back to the Parquet partitions (default)
     /// tiles: vector tiles only, so a fallback cannot hide a broken archive
@@ -1223,7 +1246,14 @@ pub fn refuse_live_extras(args: &Args) -> Result<(), String> {
         (args.osm_pbf_url.is_some(), "--osm-pbf-url"),
         (args.china_province.is_some(), "--china-province"),
         (args.china_national, "--china-national"),
+        (
+            args.map_data_profile != MapDataProfile::Standard,
+            "--map-data-profile",
+        ),
         (args.overture_detail, "--overture-detail"),
+        (args.open_buildings_vida, "--open-buildings-vida"),
+        (args.cnbh_heights, "--cnbh-heights"),
+        (args.overture_base, "--overture-base"),
         (!args.overpass_url.is_empty(), "--overpass-url"),
         (args.offline, "--offline"),
         (args.prewarm, "--prewarm"),
@@ -1341,6 +1371,24 @@ pub enum OvertureSource {
     Tiles,
     /// GeoParquet partitions only.
     Parquet,
+}
+
+/// A named collection of open map layers. Individual flags remain available
+/// for scripts, while the window presents these four packages as one control.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, clap::ValueEnum)]
+pub enum MapDataProfile {
+    /// OpenStreetMap plus the existing Overture building supplement, terrain,
+    /// land cover and 3D model pipeline.
+    #[default]
+    Standard,
+    /// Standard plus the complete monthly Overture building, transport and
+    /// place layers.
+    Overture,
+    /// Overture Complete plus CNBH-10m building heights for Chinese counties
+    /// and cities where mapped heights are sparse.
+    ChinaPlus,
+    /// China Enhanced plus Overture base water and land-use polygons.
+    Maximum,
 }
 
 /// How much of the graphics card the facade panels are allowed to ask for.
@@ -1764,11 +1812,28 @@ pub const DISASTER_GROUND_LEVEL: i32 = -40;
 /// beside Animals, and need mob griefing for their meteors to crater, so both keep natural
 /// spawning off.
 pub fn apply_feature_needs(args: &mut Args) {
+    if args.body.is_earth() {
+        match args.map_data_profile {
+            MapDataProfile::Standard => {}
+            MapDataProfile::Overture => args.overture_detail = true,
+            MapDataProfile::ChinaPlus => {
+                args.overture_detail = true;
+                args.cnbh_heights = true;
+            }
+            MapDataProfile::Maximum => {
+                args.overture_detail = true;
+                args.cnbh_heights = true;
+                args.overture_base = true;
+            }
+        }
+    }
     // The detailed data mode is one complete Overture package. Its building layer must not be
     // silently left behind when a persisted "Additional Buildings" toggle happens to be off.
     // --no-buildings still wins because both layers have nothing to render without buildings.
     args.overture |= args.overture_detail;
     args.overture &= args.buildings;
+    args.open_buildings_vida &= args.buildings;
+    args.cnbh_heights &= args.buildings;
     if !args.buildings {
         args.mapillary_facades = Some(false);
     }
@@ -1810,6 +1875,9 @@ pub fn apply_body_defaults(args: &mut Args) {
     args.mode = GenerationMode::TerrainOnly;
     args.overture = false;
     args.overture_detail = false;
+    args.open_buildings_vida = false;
+    args.cnbh_heights = false;
+    args.overture_base = false;
     args.canopy_height = false;
     args.use_3d = false;
     args.interior = false;
@@ -3703,6 +3771,65 @@ mod tests {
         };
         assert!(fetched(&["--overture-detail"]));
         assert!(!fetched(&["--overture-detail", "--no-buildings"]));
+    }
+
+    #[test]
+    fn map_data_profiles_expand_to_their_open_layers() {
+        let fetched = |profile: &str| {
+            let mut args =
+                Args::parse_from(["arnis", "--bbox", "1,2,3,4", "--map-data-profile", profile]);
+            apply_feature_needs(&mut args);
+            (
+                args.overture,
+                args.overture_detail,
+                args.cnbh_heights,
+                args.overture_base,
+            )
+        };
+        assert_eq!(fetched("standard"), (true, false, false, false));
+        assert_eq!(fetched("overture"), (true, true, false, false));
+        assert_eq!(fetched("china-plus"), (true, true, true, false));
+        assert_eq!(fetched("maximum"), (true, true, true, true));
+
+        let mut no_buildings = Args::parse_from([
+            "arnis",
+            "--bbox",
+            "1,2,3,4",
+            "--map-data-profile",
+            "maximum",
+            "--no-buildings",
+        ]);
+        apply_feature_needs(&mut no_buildings);
+        assert!(!no_buildings.overture);
+        assert!(
+            no_buildings.overture_detail,
+            "roads and places remain useful without buildings"
+        );
+        assert!(!no_buildings.cnbh_heights);
+        assert!(
+            no_buildings.overture_base,
+            "surfaces stay useful when buildings are switched off"
+        );
+    }
+
+    #[test]
+    fn map_data_profiles_stay_off_non_earth_bodies() {
+        let mut args = Args::parse_from([
+            "arnis",
+            "--bbox",
+            "1,2,3,4",
+            "--body",
+            "moon",
+            "--map-data-profile",
+            "maximum",
+        ]);
+        apply_body_defaults(&mut args);
+        apply_feature_needs(&mut args);
+        assert!(!args.overture);
+        assert!(!args.overture_detail);
+        assert!(!args.open_buildings_vida);
+        assert!(!args.cnbh_heights);
+        assert!(!args.overture_base);
     }
 
     #[test]

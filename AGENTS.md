@@ -19,7 +19,7 @@ Arnis 3.5.0 是一个 Rust 桌面应用和命令行工具，用 OpenStreetMap、
 
 ```text
 branch: main
-HEAD: 568919c658ce787453cec8df2660b790acec4a3c
+HEAD before the current multi-source change: a89613b
 clone mode: --depth 1 --filter=blob:none
 sparse checkout: /*, 已补回 /assets/, 仍排除 /tests/golden/
 ```
@@ -113,13 +113,17 @@ GUI 测试脚本是独立的 `.mjs` 文件，没有 npm 构建步骤；每个文
 ## 主数据流
 
 1. `src/args.rs` 用 Clap 解析参数、应用默认值并校验组合。
-2. `src/main.rs::run_cli` 规划输出目录和世界格式，并行获取 OSM、Overture、高程、土地覆盖等输入。
+   - `--map-data-profile=standard|overture|china-plus|maximum` 是 GUI 的四档总开关。
+   - 单独参数 `--overture-detail`、`--cnbh-heights`、`--open-buildings-vida`、`--overture-base` 供脚本和兼容路径使用。
+2. `src/main.rs::run_cli` 规划输出目录和世界格式，并行获取 OSM、Overture、VIDA 建筑、地表、高程和土地覆盖等输入。
    - `--china-national` 从 OpenStreetMap France 下载中国全国 PBF，缓存后在本地裁切所选区域。
    - `--china-province` 从 OpenStreetMap France 下载中国省级 PBF，缓存后在本地裁切。
    - `--overture-detail` 是“Overture 完整数据”模式，会同时启用 `buildings`、`transportation` 和 `places`；只取与选区相交的 z14 瓦片，不下载整档。
+   - “中国增强”再加入 CNBH-10m 中国建筑高度；“最高完整度”再加入 Overture base 的水体、土地利用和土地覆盖。
+   - VIDA China Open Buildings 保留为独立可选轮廓层，不属于四档累计组合。
 3. `src/osm_parser.rs` 过滤标签、投影坐标、裁剪几何，并形成 `ProcessedElement`。
 4. `src/ground.rs` 和 `src/ground_generation.rs` 建立地形、水体、地表和高度信息。
-5. `src/building_sources.rs` 合并激光和 Overture 建筑，随后 `src/overture/detail.rs` 补充道路、铁路与具名地点，再执行 OSM 优先级排序。建筑内的地点标签写到建筑，其余成为独立地点节点。
+5. `src/building_sources.rs` 按 OSM → Overture → VIDA 顺序合并建筑，再由 `src/cnbh.rs` 给仍缺高度的建筑补 2020 年估算高度；随后 `src/overture/detail.rs` 补充道路、铁路与具名地点，`src/overture/base.rs` 补充地表，再执行 OSM 优先级排序。建筑内的地点标签写到建筑，其余成为独立地点节点。
 6. `src/element_processing/` 将建筑、道路、铁路、水体、植被等 OSM 语义转换为方块。
 7. `src/world_editor/` 将结果写入 Java Anvil、Bedrock、Luanti 或 Hytale 格式。
 8. `src/one_world.rs`、`src/live/`、`src/datapack/`、`src/decals/` 等模块补充持久世界、联机、数据包和贴花功能。
@@ -135,11 +139,18 @@ GUI 测试脚本是独立的 `.mjs` 文件，没有 npm 构建步骤；每个文
 - GUI 选择中国全国数据时只发送 `--china-national`；选择省级数据时必须先选择省份。
 - 中国全国、省级和旧 OSM 来源互斥；切回其他来源时不能残留 `--china-national` 或 `--china-province`。
 - `--overture-detail` 不依赖保存下来的独立建筑开关：`apply_feature_needs` 和 GUI 下载计划都会自动请求 Overture 建筑；`--no-buildings` 仍优先关闭全部建筑补充。
+- 四档数据组合只在 Earth 上展开；`apply_body_defaults` 清空地表数据源后，`apply_feature_needs` 不能把 Moon/Mars 的图层重新打开。
+- 建筑合并顺序必须是 OSM 优先、Overture 次之、VIDA 只补前两者都没有的空间。OSM 中已有对象不能被外部轮廓覆盖。
+- CNBH 只给没有 `height`、没有 `building:levels` 且非 `building:part` 的建筑补高度；显式属性、实测屋顶和 LiDAR 始终优先。
 - Overture 完整层只能按 PMTiles 范围读取，绝不能下载 `buildings`、`transportation` 或 `places` PMTiles 整档。
+- VIDA 中国建筑包也必须按范围读取 z14 瓦片；VIDA 和 Overture base 分别使用独立缓存根，清理缓存和下载计划都要同步覆盖。
+- CNBH 文件按奇数 2° 网格命名，例如太仓使用 `CNBH10m_X121Y31.tif`；只能读取建筑质心所在的 256×256 压缩块，不能整幅解码进内存。
+- Overture base 的一个 feature 可能包含多个 polygon；按 ID 去重时不得把所有分段误删，只能保留几何相同的一块一次。
 - 详细层失败或部分瓦片损坏时保留 OSM 底图继续生成；`--prewarm` 和 `--offline` 的完整性由缓存文件和 `net::note_uncached` 报告。
 - GUI 与 CLI 共用 `Args`，新增字段通常需要同时处理参数解析、GUI 标志构造和本地化。
 - GUI 文案改动应同步 `src/gui/locales/en-US.json`，并检查其他翻译是否保留占位符。
 - 天文台、天象馆和球形/圆顶博物馆的自动穹顶只作为无显式形状时的推断；`roof:shape`、实测屋顶和映射的 `building:part` 必须保持更高优先级。
+- VIDA 主要提供建筑轮廓，不提供统一高度；CNBH 是 2020 年 10 米高度估算，不是逐栋实测。3D 高度仍来自 OSM/Overture 标签、CNBH 缺省值、尺寸推断、LiDAR/实测和已有模型流水线，不能声称每个村庄都有实测 3D。
 - 大型缓存、调试图片、生成世界、日志和临时输出不进入 Git。
 
 ## 修改与验证

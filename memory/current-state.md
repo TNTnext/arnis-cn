@@ -208,6 +208,34 @@ http.curloptResolve=github.com:443:140.82.112.4
 - 下一步：
   - 如需继续提升“最近新建小区”覆盖率，应评估有稳定许可的国内商业地图 API，而不是叠加更多重复的公开建筑集。
 
+## 2026-11-22：CNBH 中国建筑高度与四档地图数据
+
+- 修改：
+  - 将设置中的“详细地图数据”整理为四档累计组合：`standard`、`overture`、`china-plus`、`maximum`。
+  - 新增 `--map-data-profile=standard|overture|china-plus|maximum`，GUI 设置和 CLI 使用同一套档位。
+  - `overture` 包含 Overture buildings、transportation、places；`china-plus` 增加 CNBH-10m 高度；`maximum` 再增加 Overture base water、land_use、land_cover。
+  - 保留独立参数 `--overture-detail`、`--cnbh-heights`、`--open-buildings-vida`、`--overture-base`，供脚本和兼容路径使用。
+  - 新增 `src/cnbh.rs`，按 2° GeoTIFF 分片读取 CNBH-10m，支持 UTM 投影、Float32 像素、TIFF 块按需解码、3×3 中值过滤和 `.tif.part` 断点续传。
+  - CNBH 仅补充没有 `height`、没有 `building:levels` 且不是 `building:part` 的建筑；写入 `arnis:height_source=cnbh10m_2020`。
+  - 修正 CNBH 文件命名，`X121Y31` 正确覆盖约 `120..122 E, 30..32 N`，太仓会读取 `CNBH10m_X121Y31.tif`。
+  - README、AGENTS、内存文件、GUI 文案、locale 和数据计划同步更新。
+- 验证：
+  - `cargo check --all-targets --all-features` 通过。
+  - 完整 Rust 测试：3195 passed、0 failed、30 ignored；离线集成测试 1 passed、1 ignored；接缝测试 0 passed、1 ignored。
+  - `args::tests::capabilities_lists_every_long_flag` 通过，发布参数表包含新增开关。
+  - GUI 测试 `detail-source.mjs`、`resume.mjs`、`data-panel.mjs` 通过。
+  - CNBH 真实 GeoTIFF 元数据和投影读取测试通过；太仓分片 URL 支持 HTTP range，实测大小 335,234,763 字节并返回 HTTP 206。
+  - `cargo build --release --features gui` 完成，生成 `target/release/arnis.exe`，大小 82,029,056 字节；SHA-256 为 `6055DF55CA9498B2E1CECC9C16AFA836D4CF290094F72DE272D82B83E282D6C2`。
+- 已知限制：
+  - CNBH-10m 是 2020 年 10 米格网高度预测，不是逐栋实测，2020 年后新建建筑和复杂地标仍可能偏差。
+  - 太仓 CNBH 完整文件下载在当前网络环境过慢，未完成整文件下载和端到端世界生成验证；已保留可续传路径，不把未完成的 `.part` 文件纳入提交。
+  - Overture base 的太仓在线测试因网络长时间无响应中断；本轮没有宣称该在线回归通过。
+  - 公开数据组合不能保证中国每个自然村、新建小区、私宅和店铺逐栋、逐路、逐日完整。
+  - Windows 发布包使用 GUI 子系统，直接运行 `--capabilities` 时终端可能没有可见输出；能力表由单元测试和源码参数定义共同核验。
+- 下一步：
+  - 在网络稳定时完成太仓 CNBH 真实文件下载并生成一次世界，记录首次下载耗时、缓存大小、补高比例和内存峰值。
+  - 可继续评估有稳定许可的中国商业或行业 GIS API，但接入前必须核验授权、分区范围、建筑高度、道路增量和缓存规则。
+
 ## 追加记录格式
 
 后续记录使用以下结构：

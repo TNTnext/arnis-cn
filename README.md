@@ -32,26 +32,38 @@ arnis --china-province=beijing --output-dir="C:/YOUR_PATH/.minecraft/saves" --bb
 
 Existing global terrain, land-cover and building sources continue to supplement the selected OSM extract.
 
-### Complete detailed China data
+### Switchable map-data profiles
 
-For counties and smaller cities such as Taicang, the most complete setup is: use **China Nationwide** or **China Province** for the OpenStreetMap base map, then enable **Detailed Map Data → Overture Complete**. The single toggle now adds all available Overture detail layers together:
+**Settings → Detailed Map Data** offers four cumulative packages, so the same installation can switch between a small standard download and the broadest open-data combination without editing code:
 
-- Overture `buildings`: missing building footprints and height attributes. Overture's global aggregate is the broadest openly downloadable building collection and combines OpenStreetMap, Microsoft ML buildings, the East Asian building dataset and other compatible open sources.
-- Overture `transportation`: recent roads and railways, merged only where they are not already present in the OSM base.
-- Overture `places`: newer named shops, restaurants, schools, hospitals, stations and other points of interest. A place inside an OSM building labels that building; other places become standalone named nodes.
-- ESA WorldCover land cover and Copernicus elevation remain active as before.
+| Profile | What it adds |
+| --- | --- |
+| **Standard** | OpenStreetMap base, terrain, land cover, the existing standalone Additional Buildings choice and the measured/3D model pipeline. |
+| **Overture Complete** | Overture buildings with available height and roof attributes, roads, railways and named places. |
+| **China Enhanced** | Overture Complete plus CNBH-10m estimated building heights for buildings that have no mapped height or floor count. |
+| **Maximum Open Data** | China Enhanced plus Overture water, land-use and land-cover polygons. This is the broadest built-in package. |
 
-Overture Complete is off by default so standard downloads do not grow unexpectedly. When it is selected, the Overture building layer is included automatically even if the older standalone **Additional Buildings** switch was previously saved as off. `--no-buildings` still disables both.
+The profiles are additive and deterministic: OSM geometry stays authoritative, Overture fills the next layer, and CNBH supplies only a missing height. Explicit OSM/Overture heights, floor counts, LiDAR measurements and mapped 3D parts always win. A country-level or province-level OSM source can be selected independently in **OSM Data Source**. The Download Plan shows separate rows for Overture detail, CNBH heights and water/land use, including cached and missing tile counts.
 
-The Overture archives are planet-scale and the transportation archive is over 100 GB. Arnis never downloads either archive whole: it reads the PMTiles header, directory pages and only the z14 tiles that intersect the selected area. These pieces are cached per monthly release, so `--prewarm` can prepare a county for a later `--offline` run.
+CNBH-10m is the 2020 10 m China building-height dataset from Zenodo (CC BY 4.0). A county normally downloads one 2-degree GeoTIFF; a boundary crossing needs at most four. Arnis reads metadata and only the 256 x 256 TIFF blocks under building centroids, caching the files under `arnis-cnbh-cache`. Overture PMTiles layers are also read by range instead of as whole archives. `--prewarm` can prepare a county for a later `--offline` run.
+
+VIDA Google-Microsoft-OSM Open Buildings remains available as the independent `--open-buildings-vida` layer. It is not part of the profiles because most checked Chinese records in that archive are OSM-sourced and are skipped to avoid duplicating the already selected OSM extract. It can still add non-OSM footprints and is cached separately under `arnis-open-buildings-cache`.
 
 ```bash
-arnis --china-province=jiangsu --overture-detail --output-dir="C:/YOUR_PATH/.minecraft/saves" --bbox="31.34,121.00,31.56,121.27"
+# Broadest open package for a county such as Taicang
+arnis --china-province=jiangsu --map-data-profile=maximum \
+  --output-dir="C:/YOUR_PATH/.minecraft/saves" \
+  --bbox="31.42,121.08,31.48,121.18"
+
+# The individual layers remain available to scripts
+arnis --china-national --overture-detail --cnbh-heights --open-buildings-vida --overture-base \
+  --output-dir="C:/YOUR_PATH/.minecraft/saves" \
+  --bbox="min_lat,min_lng,max_lat,max_lng"
 ```
 
-Overture is the broadest open aggregate, but no public dataset can guarantee every lane, business and building in every Chinese village. The combination remains deliberately additive: OSM stays authoritative for mapped local geometry, while Overture fills missing buildings, roads and places from a newer monthly snapshot. The Download Plan reports what the selected area will read and cache.
+No open dataset guarantees every newly built house, private lane or shop in every Chinese village. CNBH is a 2020 estimated raster rather than a per-building survey, and VIDA supplies footprints rather than measured 3D. Arnis combines mapped heights and floor counts, CNBH estimates for gaps, ordinary height inference, measured LiDAR detail and 3D models where enabled, and recognises special observatory, planetarium and spherical/domed museum shapes. Large selections can hit each archive's tile budget; a county or city-sized selection gives the most complete result.
 
-Attribution and licenses: OpenStreetMap data is under the [ODbL](https://www.openstreetmap.org/copyright). Overture [buildings](https://docs.overturemaps.org/guides/buildings/) and [transportation](https://docs.overturemaps.org/schema/reference/transportation/segment/) are under the ODbL. Overture [places](https://docs.overturemaps.org/schema/reference/places/place/) combines sources under permissive licenses including CDLA-Permissive-2.0, Apache-2.0 and CC0. See [Overture attribution](https://docs.overturemaps.org/attribution/) for the complete source list.
+Attribution and licenses: OpenStreetMap data is under the [ODbL](https://www.openstreetmap.org/copyright). [CNBH-10m](https://doi.org/10.5281/zenodo.7923866) is distributed under CC BY 4.0. The optional VIDA [Google-Microsoft-OSM Open Buildings](https://source.coop/vida/google-microsoft-osm-open-buildings) China snapshot is dated 2024-08-27 and is distributed under the ODbL. Overture [buildings](https://docs.overturemaps.org/guides/buildings/), [transportation](https://docs.overturemaps.org/schema/reference/transportation/segment/) and base layers are under the ODbL. Overture [places](https://docs.overturemaps.org/schema/reference/places/place/) combines sources under permissive licenses including CDLA-Permissive-2.0, Apache-2.0 and CC0. See [Overture attribution](https://docs.overturemaps.org/attribution/) for the complete source list.
 
 ### Special building shapes
 
